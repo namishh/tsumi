@@ -1,0 +1,11 @@
+*
+!.gitignore
+!Cargo*
+!src
+!src/*.rs
+!src/**/*.rs
+!migrations
+!migrations/*
+!migrations/**/*.sql
+!diesel.toml
+!README.md
