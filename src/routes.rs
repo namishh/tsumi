@@ -1,29 +1,31 @@
 use axum::extract::State;
-use axum::handler::HandlerWithoutStateExt;
 use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse};
 use axum::Router;
-use axum::routing::get;
+use axum::routing::{get, post};
 use tera::Context;
-use crate::schema::users::dsl::users;
+use crate::handlers::users::create_user::create_user;
+use crate::handlers::users::get_user::get_user;
 use crate::state::AppState;
 
 pub fn app_router(state: AppState) -> Router {
     Router::new()
-        .route("/", get(root))
+        .route("/healthz", get(health))
         .route("/index", get(index))
+        .nest("/v1/users", user_routes(state.clone()))
         .fallback(handler_404)
         .with_state(state)
 }
 
-async fn root() -> &'static str {
-    "Server is running"
+async fn health() -> impl IntoResponse {
+    (StatusCode::OK, "Server is healthy")
 }
 
 async fn handler_404() -> impl IntoResponse {
     (StatusCode::NOT_FOUND, "The requested resource was not found")
 }
-async fn index(state: State<AppState>) -> Html<String> {
+
+async fn index(State(state): State<AppState>) -> Html<String> {
     let mut ctx = Context::new();
     ctx.insert("name", "quantinium");
 
@@ -31,4 +33,11 @@ async fn index(state: State<AppState>) -> Html<String> {
         Ok(rendered) => Html(rendered),
         Err(e) => Html(format!("Error rendering template: {}", e)),
     }
+}
+
+fn user_routes(state: AppState) -> Router<AppState> {
+    Router::new()
+        .route("/{id}", get(get_user))
+        .route("/create", post(create_user))
+        .with_state(state)
 }
