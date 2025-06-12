@@ -1,21 +1,12 @@
 mod config;
 
-use axum::{Json, Router, http::StatusCode, response::Html, routing::get, serve, extract::State};
-use chrono::Utc;
+use axum::{Router, response::Html, routing::get, serve, extract::State};
 use diesel::prelude::*;
-use serde::Serialize;
 use std::net::{IpAddr, SocketAddr};
 use tera::{Context, Tera};
 use tokio::net::TcpListener;
 
 use crate::config::config;
-
-#[derive(Serialize)]
-struct Response {
-    status_code: u16,
-    data: String,
-    timestamp: String,
-}
 
 pub fn establish_connection(database_url: &str) -> SqliteConnection {
     SqliteConnection::establish(&database_url)
