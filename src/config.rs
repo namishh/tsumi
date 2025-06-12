@@ -13,9 +13,15 @@ struct DatabaseConfig {
 }
 
 #[derive(Debug)]
+struct AuthSecret {
+    secret: String,
+}
+
+#[derive(Debug)]
 pub struct Config {
     server: ServerConfig,
     db: DatabaseConfig,
+    auth_secret: AuthSecret,
 }
 
 impl Config {
@@ -29,6 +35,10 @@ impl Config {
 
     pub fn server_port(&self) -> u16 {
         self.server.port
+    }
+
+    pub fn auth_secret(&self) -> &str {
+        &self.auth_secret.secret
     }
 }
 
@@ -46,9 +56,14 @@ async fn init_config() -> Config {
         url: env::var("DATABASE_URL").expect("DATABASE_URL must be set")
     };
 
+    let auth_config = AuthSecret {
+        secret: env::var("AUTH_SECRET").expect("AUTH_SECRET must be set")
+            .to_string()
+    };
     Config {
         server: server_config,
         db: database_config
+        auth_secret: auth_config
     }
 }
 
