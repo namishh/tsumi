@@ -1,5 +1,5 @@
 create table users (
-    id text not null primary key,
+    _id text not null primary key,
     username text not null unique,
     email text not null unique,
     password text not null,
