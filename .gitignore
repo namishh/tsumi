@@ -7,5 +7,7 @@
 !migrations
 !migrations/*
 !migrations/**/*.sql
+!templates/
+!templates/**/*
 !diesel.toml
 !README.md
