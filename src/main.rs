@@ -4,7 +4,7 @@ use axum::{Json, Router, http::StatusCode, response::Html, routing::get, serve, 
 use chrono::Utc;
 use diesel::prelude::*;
 use serde::Serialize;
-use std::{net::SocketAddr};
+use std::net::{IpAddr, SocketAddr};
 use tera::{Context, Tera};
 use tokio::net::TcpListener;
 
@@ -33,7 +33,10 @@ async fn main() {
         .route("/", get(index))
         .with_state(tera);
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    let addr = SocketAddr::from((config.server_host().parse::<IpAddr>().expect("Invalid IP \
+    Address"), config
+        .server_port
+    ()));
     println!("Server listening at http://{}", addr);
 
     let listener = TcpListener::bind(addr).await.unwrap();
