@@ -1,11 +1,14 @@
+mod config;
+
 use axum::{Json, Router, http::StatusCode, response::Html, routing::get, serve, extract::State};
 use chrono::Utc;
 use diesel::prelude::*;
-use dotenvy::dotenv;
 use serde::Serialize;
-use std::{env, net::SocketAddr};
+use std::{net::SocketAddr};
 use tera::{Context, Tera};
 use tokio::net::TcpListener;
+
+use crate::config::config;
 
 #[derive(Serialize)]
 struct Response {
@@ -14,17 +17,15 @@ struct Response {
     timestamp: String,
 }
 
-pub fn establish_connection() -> SqliteConnection {
-    dotenv().ok();
-
-    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+pub fn establish_connection(database_url: &str) -> SqliteConnection {
     SqliteConnection::establish(&database_url)
         .unwrap_or_else(|_| panic!("Error connecting to {}", database_url))
 }
 
 #[tokio::main]
 async fn main() {
-    establish_connection();
+    let config = config().await;
+    establish_connection(config.db_url());
 
     let tera = Tera::new("templates/**/*").unwrap_or_else(|_| panic!("Couldn't find templates"));
 
@@ -59,3 +60,4 @@ async fn hello() -> Json<Response> {
 
     Json(res)
 }
+
