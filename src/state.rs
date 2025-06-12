@@ -1,7 +1,10 @@
+use diesel::r2d2::{ConnectionManager, Pool};
+use diesel::SqliteConnection;
 use tera::Tera;
 
-#[derive(Clone, Debug)]
+type DbPool = Pool<ConnectionManager<SqliteConnection>>;
+#[derive(Clone)]
 pub struct AppState {
     pub tera: Tera,
-    pub database_url: String,
+    pub db_pool: DbPool,
 }
