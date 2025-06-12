@@ -30,8 +30,7 @@ async fn main() {
     let tera = Tera::new("templates/**/*").unwrap_or_else(|_| panic!("Couldn't find templates"));
 
     let app = Router::new()
-        .route("/", get(hello))
-        .route("/index", get(index))
+        .route("/", get(index))
         .with_state(tera);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
@@ -43,21 +42,10 @@ async fn main() {
 
 async fn index(tera: State<Tera>) -> Html<String> {
     let mut ctx = Context::new();
-    ctx.insert("name", "world");
+    ctx.insert("name", "quantinium");
 
     match tera.render("index.html", &ctx) {
         Ok(rendered) => Html(rendered),
         Err(e) => Html(format!("Error rendering template: {}", e)),
     }
 }
-
-async fn hello() -> Json<Response> {
-    let res = Response {
-        status_code: StatusCode::OK.as_u16(),
-        data: "hello".to_string(),
-        timestamp: Utc::now().to_rfc3339(),
-    };
-
-    Json(res)
-}
-
