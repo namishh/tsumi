@@ -1,12 +1,19 @@
 mod config;
+mod models;
+mod schema;
+mod state;
+mod routes;
 
-use axum::{Router, response::Html, routing::get, serve, extract::State};
+use axum::{serve};
 use diesel::prelude::*;
 use std::net::{IpAddr, SocketAddr};
-use tera::{Context, Tera};
+use tera::{Tera};
 use tokio::net::TcpListener;
 
 use crate::config::config;
+use crate::routes::app_router;
+use crate::state::*;
+
 
 pub fn establish_connection(database_url: &str) -> SqliteConnection {
     SqliteConnection::establish(&database_url)
@@ -20,26 +27,20 @@ async fn main() {
 
     let tera = Tera::new("templates/**/*").unwrap_or_else(|_| panic!("Couldn't find templates"));
 
-    let app = Router::new()
-        .route("/", get(index))
-        .with_state(tera);
+    let app_state = AppState {
+        tera,
+        database_url: config.db_url().to_string(),
+    };
+
+    let app = app_router(app_state.clone());
 
     let addr = SocketAddr::from((config.server_host().parse::<IpAddr>().expect("Invalid IP \
     Address"), config
         .server_port
     ()));
-    println!("Server listening at http://{}", addr);
 
-    let listener = TcpListener::bind(addr).await.unwrap();
-    serve(listener, app).await.unwrap();
-}
+    tracing::info!("Server listening at http://{}", addr);
 
-async fn index(tera: State<Tera>) -> Html<String> {
-    let mut ctx = Context::new();
-    ctx.insert("name", "quantinium");
-
-    match tera.render("index.html", &ctx) {
-        Ok(rendered) => Html(rendered),
-        Err(e) => Html(format!("Error rendering template: {}", e)),
-    }
+    let listener = TcpListener::bind(addr).await.expect("Failed to bind");
+    serve(listener, app).await.expect("Failed to run server");
 }
