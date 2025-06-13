@@ -1,3 +1,5 @@
+extern crate core;
+
 use axum::serve;
 use std::net::{IpAddr, SocketAddr};
 use diesel::r2d2::{ConnectionManager, Pool};
@@ -12,8 +14,8 @@ mod state;
 mod routes;
 mod handlers;
 mod db;
-mod utils;
 mod services;
+mod utils;
 
 use crate::config::config;
 use crate::routes::app_router;
@@ -34,6 +36,7 @@ async fn main() {
     let app_state = AppState {
         tera,
         db_pool: pool,
+        config,
     };
 
     let app = app_router(app_state.clone());
