@@ -10,6 +10,9 @@ use tokio::net::TcpListener;
 use diesel::sqlite::SqliteConnection;
 
 mod config;
+mod handlers;
+mod db;
+mod services;
 mod state;
 mod routes;
 mod utils;

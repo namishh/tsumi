@@ -122,7 +122,7 @@ async fn init_config() -> Config {
     };
 
     let refresh_token_config = RefreshTokenConfig {
-        secret: env::var("REFRESH_TOKEN").expect("REFRESH_SECRET must be set"),
+        secret: env::var("REFRESH_TOKEN").expect("REFRESH_TOKEN must be set"),
         expires_at: env::var("REFRESH_EXPIRES").expect("REFRESH_EXPIRES must be set")
             .parse::<i64>().expect("REFRESH_EXPIRES must be a number"),
         cookie_name: env::var("COOKIE_NAME").expect("COOKIE_NAME must be set")

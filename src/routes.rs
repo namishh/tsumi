@@ -11,13 +11,15 @@ use crate::handlers::auth::signin::sign_in;
 use crate::handlers::auth::signout::sign_out;
 use crate::handlers::auth::signup::sign_up;
 use crate::state::AppState;
+use tower_http::services::ServeDir;
 
 pub fn app_router(state: AppState) -> Router {
     Router::new()
         .route("/healthz", get(health))
-        .route("/index", get(index))
+        .route("/", get(index))
         .nest("/auth", auth_routes(state.clone()))
         .route("/login", get(login_page))
+        .nest_service("/static", ServeDir::new("static"))
         .fallback(handler_404)
         .with_state(state)
 }

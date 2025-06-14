@@ -1,11 +1,8 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Login</title>
-</head>
-<body>
+{% extends "base.html" %}
+{% block title %}index{% endblock title %}
+{% block content %}
 <h1>Login</h1>
+
 
 {# Optional: show error #}
 {% if error %}
@@ -36,6 +33,4 @@
 <hr/>
 
 <p>Don't have an account? <a href="/register">Register here</a></p>
-</body>
-</html>
-
+{% endblock content%}
