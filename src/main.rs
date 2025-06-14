@@ -12,9 +12,6 @@ use diesel::sqlite::SqliteConnection;
 mod config;
 mod state;
 mod routes;
-mod handlers;
-mod db;
-mod services;
 mod utils;
 mod errors;
 
