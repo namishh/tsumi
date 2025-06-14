@@ -16,6 +16,7 @@ mod handlers;
 mod db;
 mod services;
 mod utils;
+mod errors;
 
 use crate::config::config;
 use crate::routes::app_router;

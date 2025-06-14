@@ -28,7 +28,7 @@ async fn health() -> impl IntoResponse {
 
 
 async fn login_page(State(state): State<AppState>) -> Html<String> {
-    let mut ctx = Context::new();
+    let ctx = Context::new();
     match state.tera.render("login.html", &ctx) {
         Ok(rendered) => Html(rendered),
         Err(e) => {Html(format!("Error rendering template: {}", e))},
@@ -50,10 +50,10 @@ async fn index(State(state): State<AppState>) -> Html<String> {
 
 fn auth_routes(state: AppState) -> Router<AppState> {
     Router::new()
-        // .route("/signup", post(sign_up))
-        // .route("/signin", post(sign_in))
-        // .route("/signout", post(sign_out))
-        // .route("/refresh", post(refresh))
+        .route("/signup", post(sign_up))
+        .route("/signin", post(sign_in))
+        .route("/signout", post(sign_out))
+        .route("/refresh", post(refresh))
         .route("/github", get(github_oauth_start))
         .route("/github/callback", get(github_oauth_callback))
         .with_state(state)

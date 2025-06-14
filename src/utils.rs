@@ -1,8 +1,9 @@
 use std::error::Error;
 use base64::Engine;
 use base64::prelude::BASE64_URL_SAFE_NO_PAD;
+use diesel::r2d2::{ConnectionManager, PooledConnection};
+use diesel::SqliteConnection;
 use jsonwebtoken::{encode, EncodingKey, Header};
-use rand::Rng;
 use serde::Serialize;
 use time::{Duration, OffsetDateTime};
 use crate::state::AppState;
@@ -37,4 +38,11 @@ fn generate_csrf_token() -> String {
     let mut rng = rand::rng();
     let bytes: [u8; 32] = rng.random();
     BASE64_URL_SAFE_NO_PAD.encode(&bytes)
+}
+
+
+pub fn get_db_conn(
+    state: &AppState
+) -> Result<PooledConnection<ConnectionManager<SqliteConnection>>, Box<dyn Error>> {
+    state.db_pool.get().map_err(|e| Box::<dyn Error>::from(e))
 }
