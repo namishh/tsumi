@@ -1925,7 +1925,13 @@ class MarkdownRenderer {
       return true;
     }
 
-    // TODO: Check if selection intersects with the node and if it does, show syntax
+    if (this.selection && !this.selection.empty) {
+      const selectionStart = this.selection.from;
+      const selectionEnd = this.selection.to;
+      if (selectionStart <= nodeEnd && selectionEnd >= nodeStart) {
+        return true;
+      }
+    }
   }
 
   /**
@@ -1948,116 +1954,297 @@ class MarkdownRenderer {
 }
 
 // :: SELECTION
-class Selection {
-  constructor(anchor, head) {
-    this.anchor = anchor; // Start position of the selection
-    this.head = head || anchor; // End position of the selection
-  }
 
-  /** 
-   * Create a cursor selection.
-   * @param {number} position - The position of the cursor.
-   * @return {Selection} A new selection instance representing a cursor.
-  */
- static cursor(position) {
-    return new Selection(position, position);
+class Selection {
+  /**
+   * Creates a new Selection instance.
+   * @param {number} anchor - Start position of selection
+   * @param {number} [head=null] - End position of selection (cursor position)
+   * @param {Doc} [doc=null] - Document instance for text operations
+   */
+  constructor(anchor, head = null, doc = null) {
+    this.anchor = anchor;
+    this.head = head || anchor;
+    this.doc = doc;
   }
 
   /**
-   * Create selection with a range.
-   * @param {number} anchor - The start position of the selection.
-   * @param {number} head - The end position of the selection.
-   * @return {Selection} A new selection instance.
+   * Create a cursor selection (no range, just a position).
+   * @param {number} pos - Position for the cursor
+   * @param {Doc} [doc=null] - Document instance
+   * @returns {Selection} New cursor selection
    */
-  static range(anchor, head) {
-      return new Selection(anchor, head);
+  static cursor(pos, doc = null) {
+    return new Selection(pos, pos, doc);
   }
 
-  /** 
-   * get start position of the selection. (min of anchor and head) 
-   * @return {number} The start position of the selection.
-  */
+  /**
+   * Create a text selection with a range.
+   * @param {number} anchor - Start position of selection
+   * @param {number} head - End position of selection
+   * @param {Doc} [doc=null] - Document instance
+   * @returns {Selection} New range selection
+   */
+  static range(anchor, head, doc = null) {
+    return new Selection(anchor, head, doc);
+  }
+
+  /**
+   * Create a selection from a range object.
+   * @param {number} from - Start position of range
+   * @param {number} to - End position of range
+   * @param {Doc} [doc=null] - Document instance
+   * @returns {Selection} New selection from range
+   */
+  static fromRange(from, to, doc = null) {
+    return new Selection(from, to, doc);
+  }
+
+  /**
+   * Get the start position of the selection (minimum of anchor and head).
+   * @returns {number} Start position
+   */
   get from() {
     return Math.min(this.anchor, this.head);
   }
 
   /**
-   * get end position of the selection. (max of anchor and head)
-   * @return {number} The end position of the selection.
+   * Get the end position of the selection (maximum of anchor and head).
+   * @returns {number} End position
    */
   get to() {
     return Math.max(this.anchor, this.head);
   }
 
   /**
-   * Checks if the selection is empty (anchor and head are the same).
-   * @returns {boolean} True if the selection is empty, false otherwise.
+   * Check if this is an empty selection (cursor).
+   * @returns {boolean} True if selection is empty
    */
   get empty() {
     return this.anchor === this.head;
   }
 
   /**
-   * Checks if the selection is backwards (anchor is greater than head).
-   * @returns {boolean} True if the selection is backwards, false otherwise.
+   * Get the size of the selection.
+   * @returns {number} Size of selection
+   */
+  get size() {
+    return Math.abs(this.head - this.anchor);
+  }
+
+  /**
+   * Check if the selection is backwards (head < anchor).
+   * @returns {boolean} True if selection is backwards
    */
   get backwards() {
-    return this.anchor > this.head;
+    return this.head < this.anchor;
   }
 
-  /** 
-   * Move the selection by an offset.
-   * @param {number} offset - The offset to move the selection by.
-   * @return {Selection} A new selection instance with the moved position.
-  */
+  /**
+   * Get the direction of the selection.
+   * @returns {number} -1 for backwards, 1 for forwards, 0 for empty
+   */
+  get direction() {
+    if (this.empty) return 0;
+    return this.backwards ? -1 : 1;
+  }
+
+  /**
+   * Move the selection by a given offset.
+   * @param {number} offset - Offset to move by
+   * @returns {Selection} New moved selection
+   */
   move(offset) {
-    return new Selection(this.anchor + offset, this.head + offset);
+    return new Selection(this.anchor + offset, this.head + offset, this.doc);
   }
 
   /**
-   * Extends the selection by a given offset.
-   * @param {number} offset - The offset to extend the selection by.
-   * @return {Selection} A new selection instance with the extended range. 
-  */
-  extend(offset) {
-    return new Selection(
-      Math.min(this.anchor, this.head + offset),
-      Math.max(this.anchor, this.head + offset)
-    );
+   * Extend the selection to a new head position.
+   * @param {number} newHead - New head position
+   * @returns {Selection} New extended selection
+   */
+  extend(newHead) {
+    return new Selection(this.anchor, newHead, this.doc);
   }
 
   /**
-   * Collapse to head position.
-   * @return {Selection} A new selection instance collapsed to the head position.
+   * Collapse the selection to the head position.
+   * @returns {Selection} New collapsed selection
    */
   collapse() {
-    return new Selection(this.head, this.head);
+    return Selection.cursor(this.head, this.doc);
   }
 
   /**
-   * Collapse the selection to the start position.
-   * @return {Selection} A new selection instance collapsed to the anchor position.
+   * Collapse the selection to the start.
+   * @returns {Selection} New collapsed selection at start
    */
   collapseToStart() {
-    return new Selection(this.from, this.from); 
+    return Selection.cursor(this.from, this.doc);
   }
 
-
   /**
-   * Collapse the selection to the end position.
-   * @return {Selection} A new selection instance collapsed to the anchor position.
+   * Collapse the selection to the end.
+   * @returns {Selection} New collapsed selection at end
    */
   collapseToEnd() {
-    return new Selection(this.to, this.to);
+    return Selection.cursor(this.to, this.doc);
   }
 
   /**
-   * Checkfs is this selection is equal to another selection.
-   * @param {Selection} other - The other selection to compare.
-   * @return {boolean} True if the selections are equal, false otherwise.
+   * Check if this selection equals another selection.
+   * @param {Selection} other - Other selection to compare
+   * @returns {boolean} True if selections are equal
    */
   eq(other) {
     return this.anchor === other.anchor && this.head === other.head;
+  }
+
+  /**
+   * Clone this selection.
+   * @returns {Selection} Cloned selection
+   */
+  clone() {
+    return new Selection(this.anchor, this.head, this.doc);
+  }
+
+  /**
+   * Convert to JSON representation.
+   * @returns {Object} JSON representation of selection
+   */
+  toJSON() {
+    return {
+      anchor: this.anchor,
+      head: this.head
+    };
+  }
+
+  /**
+   * Create a selection from JSON representation.
+   * @param {Object} json - JSON object with anchor and head properties
+   * @param {Doc} [doc=null] - Document instance
+   * @returns {Selection} New selection from JSON
+   */
+  static fromJSON(json, doc = null) {
+    return new Selection(json.anchor, json.head, doc);
+  }
+
+  /**
+   * Check if a position is within this selection.
+   * @param {number} pos - Position to check
+   * @returns {boolean} True if position is within selection
+   */
+  contains(pos) {
+    return pos >= this.from && pos <= this.to;
+  }
+
+  /**
+   * Check if this selection overlaps with another selection or range.
+   * @param {Selection|Object} other - Other selection or range object with from/to properties
+   * @returns {boolean} True if selections overlap
+   */
+  overlaps(other) {
+    const otherFrom = other.from || other.anchor;
+    const otherTo = other.to || other.head;
+    return this.from < otherTo && this.to > otherFrom;
+  }
+
+  /**
+   * Get the intersection of this selection with another selection or range.
+   * @param {Selection|Object} other - Other selection or range object
+   * @returns {Selection|null} Intersection selection or null if no intersection
+   */
+  intersect(other) {
+    const otherFrom = other.from || Math.min(other.anchor, other.head);
+    const otherTo = other.to || Math.max(other.anchor, other.head);
+
+    const from = Math.max(this.from, otherFrom);
+    const to = Math.min(this.to, otherTo);
+
+    if (from <= to) {
+      return new Selection(from, to, this.doc);
+    }
+
+    return null;
+  }
+
+  /**
+   * Get the selected text content.
+   * @returns {string} Selected text or empty string if no doc or empty selection
+   */
+  getSelectedText() {
+    if (!this.doc || this.empty) {
+      return '';
+    }
+
+    // This will need to be implemented with the document structure
+    // For now, return empty string
+    return '';
+  }
+
+  /**
+   * Get the node and offset at the anchor position.
+   * @returns {Object|null} Node information at anchor position
+   */
+  getAnchorNode() {
+    if (!this.doc) return null;
+    return this.doc.nodeAt(this.anchor);
+  }
+
+  /**
+   * Get the node and offset at the head position.
+   * @returns {Object|null} Node information at head position
+   */
+  getHeadNode() {
+    if (!this.doc) return null;
+    return this.doc.nodeAt(this.head);
+  }
+
+  /**
+   * Check if the selection spans multiple blocks.
+   * @returns {boolean} True if selection spans multiple block nodes
+   */
+  spansMultipleBlocks() {
+    if (this.empty || !this.doc) return false;
+
+    const anchorNode = this.getAnchorNode();
+    const headNode = this.getHeadNode();
+
+    if (!anchorNode || !headNode) return false;
+
+    return anchorNode.node !== headNode.node &&
+      (anchorNode.node.isBlock() || headNode.node.isBlock());
+  }
+
+  /**
+   * Get all nodes that are fully or partially selected.
+   * @returns {Array} Array of selected nodes
+   */
+  getSelectedNodes() {
+    if (!this.doc || this.empty) return [];
+
+    // This will be implemented with proper document traversal
+    return [];
+  }
+
+  /**
+   * Create a range object from this selection.
+   * @returns {Object} Range object with from and to properties
+   */
+  toRange() {
+    return {
+      from: this.from,
+      to: this.to
+    };
+  }
+
+  /**
+   * Set the document for this selection.
+   * @param {Doc} doc - Document instance to associate with selection
+   * @returns {Selection} New selection with document attached
+   */
+  withDoc(doc) {
+    return new Selection(this.anchor, this.head, doc);
   }
 }
 
@@ -2072,13 +2259,16 @@ class Editor {
   constructor(element) {
     this.element = element;
     this.parser = new MarkdownParser();
+    this.selection = new Selection(0, 0);
     this.doc = Doc.empty();
 
     this.init()
   }
 
   init() {
-    this.renderer = new MarkdownRenderer(this);
+    this.renderer = new MarkdownRenderer(this, {
+      selection: this.selection,
+    });
   }
 
   example(markdown_string) {
