@@ -1,6 +1,15 @@
 // ::NODE
 
+/**
+ * Represents a node in the document tree.
+ */
 class DocNode {
+  /**
+   * Creates a new document node.
+   * @param {string} type - The type of the node (e.g., "text", "paragraph", "heading").
+   * @param {string|Array<DocNode>} [content=null] - The content of the node, either text or an array of child nodes.
+   * @param {Object} [attrs={}] - Additional attributes for the node.
+   */
   constructor(type, content = null, attrs = {}) {
     this.type = type;
     this.content = content;
@@ -8,61 +17,131 @@ class DocNode {
     this.marks = [];
   }
 
+  /**
+   * Creates a text node.
+   * @param {string} text - The text content.
+   * @param {Array<Mark>} [marks=[]] - An array of marks to apply to the text.
+   * @returns {DocNode} A new text node.
+   */
   static text(text, marks = []) {
     const node = new DocNode("text", text);
     node.marks = marks;
     return node;
   }
 
+  /**
+   * Creates a paragraph node.
+   * @param {Array<DocNode>} [content=[]] - The content of the paragraph.
+   * @returns {DocNode} A new paragraph node.
+   */
   static paragraph(content = []) {
     return new DocNode("paragraph", content);
   }
 
+  /**
+   * Creates a heading node.
+   * @param {number} level - The heading level (1-6).
+   * @param {Array<DocNode>} [content=[]] - The content of the heading.
+   * @returns {DocNode} A new heading node.
+   */
   static heading(level, content = []) {
     return new DocNode("heading", content, { level });
   }
 
+  /**
+   * Creates a code block node.
+   * @param {Array<DocNode>} [content=[]] - The content of the code block.
+   * @param {string} [language=null] - The programming language of the code.
+   * @returns {DocNode} A new code block node.
+   */
   static codeBlock(content = [], language = null) {
     const attrs = language ? { language } : {};
     return new DocNode("code_block", content, attrs);
   }
 
+  /**
+   * Creates a blockquote node.
+   * @param {Array<DocNode>} [content=[]] - The content of the blockquote.
+   * @returns {DocNode} A new blockquote node.
+   */
   static blockquote(content = []) {
     return new DocNode("blockquote", content);
   }
 
+  /**
+   * Creates a list item node.
+   * @param {Array<DocNode>} [content=[]] - The content of the list item.
+   * @returns {DocNode} A new list item node.
+   */
   static listItem(content = []) {
     return new DocNode("list_item", content);
   }
 
+  /**
+   * Creates an ordered list node.
+   * @param {Array<DocNode>} [content=[]] - The list items.
+   * @returns {DocNode} A new ordered list node.
+   */
   static orderedList(content = []) {
     return new DocNode("ordered_list", content);
   }
 
+  /**
+   * Creates a bullet list node.
+   * @param {Array<DocNode>} [content=[]] - The list items.
+   * @returns {DocNode} A new bullet list node.
+   */
   static bulletList(content = []) {
     return new DocNode("bullet_list", content);
   }
 
+  /**
+   * Creates an image node.
+   * @param {string} src - The source URL of the image.
+   * @param {string} [alt=""] - The alt text for the image.
+   * @param {string} [title=""] - The title of the image.
+   * @returns {DocNode} A new image node.
+   */
   static image(src, alt = "", title = "") {
     return new DocNode("image", null, { src, alt, title });
   }
 
+  /**
+   * Creates a horizontal rule node.
+   * @returns {DocNode} A new horizontal rule node.
+   */
   static horizontalRule() {
     return new DocNode("horizontal_rule");
   }
 
+  /**
+   * Checks if the node is a text node.
+   * @returns {boolean} True if the node is a text node, false otherwise.
+   */
   isText() {
     return this.type === "text";
   }
 
+  /**
+   * Checks if the node is a block-level node.
+   * @returns {boolean} True if the node is a block node, false otherwise.
+   */
   isBlock() {
     return ["paragraph", "heading", "code_block", "blockquote", "list_item", "ordered_list", "bullet_list", "horizontal_rule"].includes(this.type);
   }
 
+  /**
+   * Checks if the node is an inline node.
+   * @returns {boolean} True if the node is an inline node, false otherwise.
+   */
   isInline() {
     return ["image"].includes(this.type);
   }
 
+  /**
+   * Retrieves the text content of the node and its children.
+   * @returns {string} The text content.
+   */
   textContent() {
     if (this.isText()) {
       return this.content || "";
@@ -75,6 +154,10 @@ class DocNode {
     return "";
   }
 
+  /**
+   * Calculates the size of the node in characters.
+   * @returns {number} The size of the node.
+   */
   nodeSize() {
     if (this.isText()) {
       return (this.content || "").length;
@@ -87,6 +170,10 @@ class DocNode {
     return 0;
   }
 
+  /**
+   * Creates a deep copy of the node.
+   * @returns {DocNode} A cloned node.
+   */
   clone() {
     const cloned = new DocNode(this.type, null, { ...this.attrs });
 
@@ -100,6 +187,10 @@ class DocNode {
     return cloned;
   }
 
+  /**
+   * Serializes the node to a JSON object.
+   * @returns {Object} The JSON representation of the node.
+   */
   toJSON() {
     const json = {
       type: this.type
@@ -122,13 +213,18 @@ class DocNode {
     return json;
   }
 
+  /**
+   * Creates a node from a JSON object.
+   * @param {Object} json - The JSON object representing the node.
+   * @returns {DocNode} A new node instance.
+   */
   static fromJSON(json) {
-    const node = new Node(json.type, null, json.attrs || {});
+    const node = new DocNode(json.type, null, json.attrs || {});
 
     if (json.text !== undefined) {
       node.content = json.text;
     } else if (json.content) {
-      node.content = json.content.map(childJSON => Node.fromJSON(childJSON));
+      node.content = json.content.map(childJSON => DocNode.fromJSON(childJSON));
     }
 
     if (json.marks) {
@@ -141,28 +237,57 @@ class DocNode {
 
 // :: DOC
 
+/**
+ * Represents the entire document.
+ */
 class Doc {
+  /**
+   * Creates a new document.
+   * @param {Array<DocNode>} [content=[]] - The content of the document.
+   */
   constructor(content = []) {
     this.content = content;
     this.type = "doc";
   }
 
+  /**
+   * Creates an empty document with a single empty paragraph.
+   * @returns {Doc} A new empty document.
+   */
   static empty() {
     return new Doc([DocNode.paragraph()]);
   }
 
+  /**
+   * Parses Markdown text into a document.
+   * @param {string} markdown - The Markdown text to parse.
+   * @returns {Doc} A new document instance.
+   */
   static fromMarkdown(markdown) {
     return new MarkdownParser().parse(markdown);
   }
 
+  /**
+   * Calculates the total size of the document in characters.
+   * @returns {number} The size of the document.
+   */
   nodeSize() {
     return this.content.reduce((size, node) => size + node.nodeSize(), 0);
   }
 
+  /**
+   * Retrieves the entire text content of the document.
+   * @returns {string} The text content.
+   */
   textContent() {
     return this.content.map(node => node.textContent()).join("\n");
   }
 
+  /**
+   * Finds the node at the specified position.
+   * @param {number} pos - The position in the document.
+   * @returns {Object|null} An object containing the node, offset, path, and parent, or null if not found.
+   */
   nodeAt(pos) {
     let currentPos = 0;
 
@@ -193,7 +318,13 @@ class Doc {
     return null;
   }
 
-  // find a node at a specific position within a node
+  /**
+   * Finds a node at a specific position within another node.
+   * @param {DocNode} node - The node to search within.
+   * @param {number} pos - The position within the node.
+   * @param {Array<number>} path - The path to the node.
+   * @returns {Object|null} An object containing the node, offset, parent, and path, or null if not found.
+   */
   findInNode(node, pos, path = []) {
     let currentPos = 0;
 
@@ -223,11 +354,20 @@ class Doc {
     }
   }
 
+  /**
+   * Creates a deep copy of the document.
+   * @returns {Doc} A cloned document.
+   */
   clone() {
     return new Doc(this.content.map(node => node.clone()));
   }
 
-  // insert content at a specific position
+  /**
+   * Inserts content at the specified position.
+   * @param {number} pos - The position to insert at.
+   * @param {string|DocNode} content - The content to insert (text or node).
+   * @returns {Doc} A new document with the inserted content.
+   */
   insert(pos, content) {
     const result = this.nodeAt(pos);
     if (!result) {
@@ -259,6 +399,12 @@ class Doc {
     return newDoc;
   }
 
+  /**
+   * Deletes content between the specified positions.
+   * @param {number} from - The starting position.
+   * @param {number} to - The ending position.
+   * @returns {Doc} A new document with the content deleted.
+   */
   delete(from, to) {
     if (from >= to) return this.clone();
 
@@ -275,15 +421,26 @@ class Doc {
       return newDoc;
     }
 
-
     // TODO: HANDLE DELETION ACROSS MULTIPLE NODES
     return newDoc;
   }
 
+  /**
+   * Replaces content between positions with new content.
+   * @param {number} from - The starting position.
+   * @param {number} to - The ending position.
+   * @param {string|DocNode} content - The content to insert.
+   * @returns {Doc} A new document with the content replaced.
+   */
   replace(from, to, content) {
     return this.delete(from, to).insert(from, content);
   }
 
+  /**
+   * Splits a text node at the specified position.
+   * @param {number} pos - The position to split at.
+   * @returns {Doc} A new document with the node split.
+   */
   split(pos) {
     const result = this.nodeAt(pos);
     if (!result || !result.node.isText()) return this.clone();
@@ -306,6 +463,11 @@ class Doc {
     return newDoc;
   }
 
+  /**
+   * Joins two adjacent text nodes at the specified position.
+   * @param {number} pos - The position to join at.
+   * @returns {Doc} A new document with the nodes joined.
+   */
   join(pos) {
     const result = this.nodeAt(pos);
     if (!result) return this.clone();
@@ -330,6 +492,10 @@ class Doc {
     return newDoc;
   }
 
+  /**
+   * Serializes the document to a JSON object.
+   * @returns {Object} The JSON representation of the document.
+   */
   toJSON() {
     return {
       type: 'doc',
@@ -337,11 +503,21 @@ class Doc {
     };
   }
 
+  /**
+   * Creates a document from a JSON object.
+   * @param {Object} json - The JSON object representing the document.
+   * @returns {Doc} A new document instance.
+   */
   static fromJSON(json) {
     const content = json.content ? json.content.map(nodeJSON => DocNode.fromJSON(nodeJSON)) : [];
     return new Doc(content);
   }
 
+  /**
+   * Finds all nodes of a specific type.
+   * @param {string} type - The type of nodes to find.
+   * @returns {Array<{node: DocNode, path: Array<number>}>} An array of objects containing the nodes and their paths.
+   */
   findNodesByType(type) {
     const nodes = [];
 
@@ -363,16 +539,25 @@ class Doc {
     return nodes;
   }
 
+  /**
+   * Gets the first child node.
+   * @returns {DocNode|null} The first child node or null if none.
+   */
   firstChild() {
     return this.content[0] || null;
   }
 
+  /**
+   * Gets the last child node.
+   * @returns {DocNode|null} The last child node or null if none.
+   */
   lastChild() {
     return this.content[this.content.length - 1] || null;
   }
 
   /**
-   * Check if the document is empty
+   * Checks if the document is empty.
+   * @returns {boolean} True if the document is empty, false otherwise.
    */
   isEmpty() {
     if (this.content.length === 0) {
@@ -395,7 +580,8 @@ class Doc {
   }
 
   /**
-   * Validate the document structure
+   * Validates the document structure.
+   * @returns {Array<string>} An array of error messages, or an empty array if valid.
    */
   validate() {
     // Check that all nodes are valid
@@ -420,6 +606,11 @@ class Doc {
     return errors;
   }
 
+  /**
+   * Calculates the position from a node path.
+   * @param {Array<number>} path - The path to the node.
+   * @returns {number} The position in the document.
+   */
   getPositionByPath(path) {
     let pos = 0;
     let current = this;
@@ -439,11 +630,20 @@ class Doc {
     return pos;
   }
 
+  /**
+   * Gets the path to the node at the specified position.
+   * @param {number} pos - The position in the document.
+   * @returns {Array<number>} The path to the node.
+   */
   getPathByPosition(pos) {
     const result = this.nodeAt(pos);
     return result ? result.path : [];
   }
 
+  /**
+   * Iterates over all text nodes in the document.
+   * @param {Function} callback - The callback function to call for each text node.
+   */
   forEachTextNode(callback) {
     const traverse = (node, path = []) => {
       if (node.isText()) {
@@ -460,6 +660,11 @@ class Doc {
     });
   }
 
+  /**
+   * Converts a position to line and column numbers.
+   * @param {number} pos - The position in the document.
+   * @returns {Object} An object with line and column properties.
+   */
   getLineColumn(pos) {
     const text = this.textContent();
     const beforePos = text.slice(0, pos);
@@ -471,6 +676,12 @@ class Doc {
     };
   }
 
+  /**
+   * Converts line and column to a position.
+   * @param {number} line - The line number.
+   * @param {number} column - The column number.
+   * @returns {number} The position in the document.
+   */
   getPositionFromLineColumn(line, column) {
     const text = this.textContent();
     const lines = text.split('\n');
@@ -488,6 +699,11 @@ class Doc {
     return pos;
   }
 
+  /**
+   * Retrieves the node at the specified path.
+   * @param {Array<number>} path - The path to the node.
+   * @returns {DocNode|null} The node at the path or null if not found.
+   */
   getNodeAtPath(path) {
     let currentNode = { content: this.content };
     for (let i = 0; i < path.length; i++) {
@@ -500,6 +716,11 @@ class Doc {
     return currentNode;
   }
 
+  /**
+   * Finds the position of a specific node.
+   * @param {DocNode} targetNode - The node to find.
+   * @returns {number} The position of the node or -1 if not found.
+   */
   getPositionOfNode(targetNode) {
     let position = 0;
     const traverse = (nodes) => {
@@ -520,40 +741,71 @@ class Doc {
     };
     return traverse(this.content);
   }
-
 }
 
 // :: MARK
-// represents inline formatting like bold, italic, etc. applied to text nodes to
-// provide styling
 
+/**
+ * Represents an inline formatting mark.
+ */
 class Mark {
+  /**
+   * Creates a new mark.
+   * @param {string} type - The type of the mark (e.g., "bold", "italic").
+   * @param {Object} [attrs={}] - Additional attributes for the mark.
+   */
   constructor(type, attrs = {}) {
     this.type = type;
     this.attrs = attrs;
   }
 
+  /**
+   * Creates a bold mark.
+   * @returns {Mark} A new bold mark.
+   */
   static bold() {
     return new Mark("bold");
   }
 
+  /**
+   * Creates an italic mark.
+   * @returns {Mark} A new italic mark.
+   */
   static italic() {
     return new Mark("italic");
   }
 
-  // inline code 
+  /**
+   * Creates an inline code mark.
+   * @returns {Mark} A new code mark.
+   */
   static code() {
     return new Mark("code");
   }
 
+  /**
+   * Creates a link mark.
+   * @param {string} href - The URL of the link.
+   * @param {string} [title=""] - The title of the link.
+   * @returns {Mark} A new link mark.
+   */
   static link(href, title = "") {
     return new Mark("link", { href, title });
   }
 
+  /**
+   * Creates a strikethrough mark.
+   * @returns {Mark} A new strikethrough mark.
+   */
   static strikethrough() {
     return new Mark("strikethrough");
   }
 
+  /**
+   * Checks if this mark is equal to another mark.
+   * @param {Mark} other - The other mark to compare.
+   * @returns {boolean} True if the marks are equal, false otherwise.
+   */
   eq(other) {
     if (this.type !== other.type) {
       return false;
@@ -578,10 +830,18 @@ class Mark {
     return true;
   }
 
+  /**
+   * Creates a copy of the mark.
+   * @returns {Mark} A cloned mark.
+   */
   clone() {
     return new Mark(this.type, { ...this.attrs });
   }
 
+  /**
+   * Serializes the mark to a JSON object.
+   * @returns {Object} The JSON representation of the mark.
+   */
   toJSON() {
     const json = {
       type: this.type
@@ -594,10 +854,19 @@ class Mark {
     return json;
   }
 
+  /**
+   * Creates a mark from a JSON object.
+   * @param {Object} json - The JSON object representing the mark.
+   * @returns {Mark} A new mark instance.
+   */
   static fromJSON(json) {
     return new Mark(json.type, json.attrs || {});
   }
 
+  /**
+   * Returns the CSS class for the mark.
+   * @returns {string} The CSS class.
+   */
   getCSSClass() {
     switch (this.type) {
       case 'bold':
@@ -615,6 +884,10 @@ class Mark {
     }
   }
 
+  /**
+   * Returns HTML attributes for the mark.
+   * @returns {Object} An object containing HTML attributes.
+   */
   getHTMLAttrs() {
     const attrs = {};
 
@@ -630,6 +903,10 @@ class Mark {
     return attrs;
   }
 
+  /**
+   * Returns the appropriate HTML tag for the mark.
+   * @returns {string} The HTML tag.
+   */
   getHTMLTag() {
     switch (this.type) {
       case 'bold':
@@ -648,13 +925,25 @@ class Mark {
   }
 }
 
-// MarkSet class represents a collection of marks
-// Used to efficiently manage and compare sets of marks
+// :: MARKSET
+
+/**
+ * Represents a set of marks.
+ */
 class MarkSet {
+  /**
+   * Creates a new set of marks.
+   * @param {Array<Mark>} [marks=[]] - The marks in the set.
+   */
   constructor(marks = []) {
     this.marks = marks;
   }
 
+  /**
+   * Adds a mark to the set if it's not already present.
+   * @param {Mark} mark - The mark to add.
+   * @returns {MarkSet} A new mark set with the added mark.
+   */
   add(mark) {
     for (const existing of this.marks) {
       if (existing.eq(mark)) {
@@ -665,15 +954,30 @@ class MarkSet {
     return new MarkSet([...this.marks, mark]);
   }
 
+  /**
+   * Removes a mark from the set.
+   * @param {Mark} mark - The mark to remove.
+   * @returns {MarkSet} A new mark set without the removed mark.
+   */
   remove(mark) {
     const filtered = this.marks.filter(existing => !existing.eq(mark));
     return new MarkSet(filtered);
   }
 
+  /**
+   * Checks if the set contains a specific mark.
+   * @param {Mark} mark - The mark to check for.
+   * @returns {boolean} True if the mark is in the set, false otherwise.
+   */
   contains(mark) {
     return this.marks.some(existing => existing.eq(mark));
   }
 
+  /**
+   * Checks if this set is equal to another set.
+   * @param {MarkSet} other - The other mark set to compare.
+   * @returns {boolean} True if the sets are equal, false otherwise.
+   */
   eq(other) {
     if (this.marks.length !== other.marks.length) {
       return false;
@@ -688,22 +992,41 @@ class MarkSet {
     return true;
   }
 
+  /**
+   * Returns the marks as an array.
+   * @returns {Array<Mark>} The array of marks.
+   */
   toArray() {
     return [...this.marks];
   }
 
+  /**
+   * Creates an empty mark set.
+   * @returns {MarkSet} A new empty mark set.
+   */
   static empty() {
     return new MarkSet([]);
   }
 
+  /**
+   * Creates a mark set from an array of marks.
+   * @param {Array<Mark>} marks - The marks to include in the set.
+   * @returns {MarkSet} A new mark set.
+   */
   static from(marks) {
     return new MarkSet(marks);
   }
 }
 
-
 // :: PARSER
+
+/**
+ * Parses Markdown text into a document model.
+ */
 class MarkdownParser {
+  /**
+   * Initializes the parser with rules and patterns.
+   */
   constructor() {
     this.rules = {
       escape: /\\(.)/g,
@@ -720,7 +1043,6 @@ class MarkdownParser {
       bulletList: /^[-*+]\s+(.+)$/,
       horizontalRule: /^(-{3,}|\*{3,}|_{3,})$/,
     };
-
 
     this.blockRules = [
       {
@@ -739,8 +1061,6 @@ class MarkdownParser {
           return null;
         }
       },
-
-      // CODE BLOCKS 
       {
         test: (line, lines, index) => {
           const match = line.match(this.patterns.codeBlockStart);
@@ -766,8 +1086,6 @@ class MarkdownParser {
           return null;
         }
       },
-
-      // BLOCK QUOTES
       {
         test: (line, lines, index) => {
           if (line.match(this.patterns.blockquote)) {
@@ -790,8 +1108,6 @@ class MarkdownParser {
           return null;
         }
       },
-
-      // ORDERED LISTS
       {
         test: (line, lines, index) => {
           const match = line.match(this.patterns.orderedList);
@@ -823,8 +1139,6 @@ class MarkdownParser {
           return null;
         }
       },
-
-      // UNORDERED LISTS
       {
         test: (line, lines, index) => {
           const match = line.match(this.patterns.bulletList);
@@ -856,8 +1170,6 @@ class MarkdownParser {
           return null;
         }
       },
-
-      // HORIZONTAL RULE
       {
         test: (line) => {
           if (line.match(this.patterns.horizontalRule)) {
@@ -874,6 +1186,11 @@ class MarkdownParser {
     ];
   }
 
+  /**
+   * Parses the given Markdown text into a document.
+   * @param {string} markdown - The Markdown text to parse.
+   * @returns {Doc} The parsed document.
+   */
   parse(markdown) {
     if (typeof markdown !== "string") {
       return Doc.empty();
@@ -890,6 +1207,13 @@ class MarkdownParser {
     return new Doc(nodes);
   }
 
+  /**
+   * Matches a block rule against the current line.
+   * @param {string} line - The current line.
+   * @param {Array<string>} lines - The array of all lines.
+   * @param {number} index - The current index in the lines array.
+   * @returns {Object|null} The matched block or null.
+   */
   matchBlockRule(line, lines, index) {
     for (const rule of this.blockRules) {
       const match = rule.test(line, lines, index);
@@ -900,6 +1224,11 @@ class MarkdownParser {
     return null;
   }
 
+  /**
+   * Parses inline content into nodes.
+   * @param {string} text - The text to parse.
+   * @returns {Array<DocNode>} The parsed nodes.
+   */
   parseInlineContent(text) {
     if (!text || typeof text !== 'string') {
       return [DocNode.text('')];
@@ -909,6 +1238,11 @@ class MarkdownParser {
     return this.tokensToNodes(tokens);
   }
 
+  /**
+   * Converts tokens to nodes.
+   * @param {Array<Object>} tokens - The tokens to convert.
+   * @returns {Array<DocNode>} The corresponding nodes.
+   */
   tokensToNodes(tokens) {
     const nodes = [];
 
@@ -964,6 +1298,11 @@ class MarkdownParser {
     return nodes.length > 0 ? nodes : [DocNode.text('')];
   }
 
+  /**
+   * Tokenizes inline text into marks and text.
+   * @param {string} text - The text to tokenize.
+   * @returns {Array<Object>} The tokens.
+   */
   tokenizeInline(text) {
     const tokens = [];
     let pos = 0;
@@ -1022,7 +1361,11 @@ class MarkdownParser {
     return tokens;
   }
 
-
+  /**
+   * Converts a parsed block to a node.
+   * @param {Object} block - The parsed block.
+   * @returns {DocNode|null} The corresponding node or null.
+   */
   blockToNode(block) {
     switch (block.type) {
       case 'heading':
@@ -1061,6 +1404,11 @@ class MarkdownParser {
     }
   }
 
+  /**
+   * Parses an array of lines into blocks.
+   * @param {Array<string>} lines - The lines to parse.
+   * @returns {Array<Object>} The parsed blocks.
+   */
   parseBlocks(lines) {
     const blocks = [];
     let i = 0;
@@ -1099,13 +1447,18 @@ class MarkdownParser {
 
     return blocks;
   }
-
 }
-
 
 // :: RENDERER
 
+/**
+ * Renders the document model into HTML.
+ */
 class MarkdownRenderer {
+  /**
+   * Initializes the renderer.
+   * @param {Object} [options={}] - Rendering options.
+   */
   constructor(options = {}) {
     this.cursorPosition = options.cursorPosition || null;
     this.selection = options.selection || null;
@@ -1113,6 +1466,14 @@ class MarkdownRenderer {
     this.nodeElements = new Map()
   }
 
+  /**
+   * Renders the document into the specified container.
+   * @param {Doc} doc - The document to render.
+   * @param {HTMLElement} container - The container element.
+   * @param {number} [cursorPosition=null] - The cursor position.
+   * @param {Object} [selection=null] - The selection object.
+   * @returns {HTMLElement} The container element.
+   */
   render(doc, container, cursorPosition = null, selection = null) {
     this.cursorPosition = cursorPosition;
     this.selection = selection;
@@ -1126,9 +1487,437 @@ class MarkdownRenderer {
     this.nodeElements.clear();
 
     doc.content.forEach((node, index) => {
-      // TODO TODO TODO TODO TODO
+      const element = this.renderNode(node, { path: [index] });
+      if (element) {
+        container.appendChild(element);
+      }
     })
+
+    this.updateSyntaxVisibility();
+    return container;
   }
+
+  /**
+   * Renders a single node.
+   * @param {DocNode} node - The node to render.
+   * @param {Object} context - The rendering context.
+   * @returns {HTMLElement|null} The rendered element or null.
+   */
+  renderNode(node, context = {}) {
+    switch (node.type) {
+      case 'text':
+        return this.renderTextNode(node, context);
+
+      case 'paragraph':
+        return this.renderParagraph(node, context);
+
+      case 'heading':
+        return this.renderHeading(node, context);
+
+      case 'code_block':
+        return this.renderCodeBlock(node, context);
+
+      case 'blockquote':
+        return this.renderBlockquote(node, context);
+
+      case 'list_item':
+        return this.renderListItem(node, context);
+
+      case 'ordered_list':
+        return this.renderOrderedList(node, context);
+
+      case 'bullet_list':
+        return this.renderBulletList(node, context);
+
+      case 'image':
+        return this.renderImage(node, context);
+
+      case 'horizontal_rule':
+        return this.renderHorizontalRule();
+
+      default:
+        console.warn(`Unknown node type: ${node.type}`);
+        return null;
+    }
+  }
+
+  /**
+   * Creates an HTML element for a mark.
+   * @param {Mark} mark - The mark to create an element for.
+   * @param {object} context - The context.
+   * @returns {HTMLElement} The created element.
+   */
+  createMarkElement(mark, context) {
+    const element = document.createElement(mark.getHTMLTag());
+    const cssc = mark.getCSSClass();
+    if (cssc) {
+      element.classList.add(cssc);
+    }
+
+    const attrs = mark.getHTMLAttrs();
+    Object.entries(attrs).forEach(([key, value]) => {
+      if (value) {
+        element.setAttribute(key, value);
+      }
+    })
+
+    return element;
+  }
+
+  /**
+   * Applies marks to a text node.
+   * @param {string} text - The text content.
+   * @param {Array<Mark>} marks - The marks to apply.
+   * @param {object} context - The rendering context.
+   */
+  applyMarks(text, marks, context) {
+    let element = document.createTextNode(text);
+    for (const mark of marks) {
+      const wrapper = this.createMarkElement(mark, context);
+      wrapper.appendChild(element);
+      element = wrapper;
+    }
+
+    return element;
+  }
+
+  /**
+   * Renders a text node.
+   * @param {DocNode} node - The text node to render.
+   * @param {object} context - The rendering context.
+   * @returns {HTMLElement} The rendered text element.
+   */
+  renderTextNode(node, context) {
+    let element
+    if (node.marks && node.marks.length > 0) {
+      element = this.applyMarks(node.content, node.marks, context);
+    } else {
+      // plain text
+      element = document.createTextNode(node.content || '');
+    }
+
+    this.nodeElements.set(node, element);
+    return element;
+  }
+
+  /** 
+   * Renders a paragraph node.
+   * @param {DocNode} node - The paragraph node to render.
+   * @param {object} context - The rendering context.
+   * @returns {HTMLElement} The rendered paragraph element. 
+   */
+  renderParagraph(node, context) {
+    const { path = [] } = context;
+    const element = document.createElement('p');
+    element.classList.add('paragraph');
+
+    if (Array.isArray(node.content)) {
+      node.content.forEach((childNode, index) => {
+        const childElement = this.renderNode(childNode, { path: [...path, index] });
+        if (childElement) {
+          element.appendChild(childElement);
+        }
+      });
+    }
+
+    this.nodeElements.set(node, element);
+    return element
+  }
+
+  /**        
+    * Renders a heading node.
+    * @param {DocNode} node - The heading node to render.
+    * @param {object} context - The rendering context.
+    * @returns {HTMLElement} The rendered heading element. 
+   */
+  renderHeading(node, context) {
+    const { path = [] } = context;
+    const level = node.attrs.level || 1;
+    const element = document.createElement(`h${level}`);
+    element.classList.add('heading', `heading-${level}`);
+
+    const syntaxElement = document.createElement('span');
+    syntaxElement.classList.add('syntax', 'heading-syntax');
+    syntaxElement.textContent = '#'.repeat(level) + ' ';
+
+    this.syntaxElements.set(syntaxElement, {
+      type: 'heading',
+      level: level,
+      path: path
+    })
+
+    element.appendChild(syntaxElement);
+    if (Array.isArray(node.content)) {
+      node.content.forEach((child, index) => {
+        const childElement = this.renderNode(child, {
+          path: [...path, index]
+        });
+        if (childElement) {
+          element.appendChild(childElement);
+        }
+      });
+    }
+
+    this.nodeElements.set(node, element);
+    return element;
+  }
+
+  /**        
+    * Renders a codeblock.
+    * @param {DocNode} node - The codeblock to render.
+    * @param {object} context - The rendering context.
+    * @returns {HTMLElement} The rendered heading element. 
+   */
+  renderCodeBlock(node, context) {
+    const { path = [] } = context;
+    const pre = document.createElement('pre');
+    const code = document.createElement('code');
+
+    pre.classList.add('code-block');
+    code.classList.add('code-block-content');
+
+    if (node.attrs.language) {
+      code.classList.add(`language-${node.attrs.language}`);
+    }
+
+    const openSyntax = document.createElement('div');
+    openSyntax.classList.add('syntax', 'code-block-syntax', 'code-block-open');
+    openSyntax.textContent = '```' + (node.attrs.language || '');
+
+    const closeSyntax = document.createElement('div');
+    closeSyntax.classList.add('syntax', 'code-block-syntax', 'code-block-close');
+    closeSyntax.textContent = '```';
+
+    this.syntaxElements.set(openSyntax, {
+      type: 'code_block',
+      position: 'open',
+      path: path
+    });
+    this.syntaxElements.set(closeSyntax, {
+      type: 'code_block',
+      position: 'close',
+      path: path
+    });
+
+    if (Array.isArray(node.content)) {
+      node.content.forEach((child, index) => {
+        const childElement = this.renderNode(child, {
+          path: [...path, index]
+        });
+        if (childElement) {
+          code.appendChild(childElement);
+        }
+      });
+    }
+
+    pre.appendChild(openSyntax);
+    pre.appendChild(code);
+    pre.appendChild(closeSyntax);
+
+    this.nodeElements.set(node, pre);
+    return pre;
+  }
+
+  /**        
+    * Renders a blockquotes.
+    * @param {DocNode} node - The blockquote to render.
+    * @param {object} context - The rendering context.
+    * @returns {HTMLElement} The rendered heading element. 
+   */
+  renderBlockquote(node, context) {
+    const { path = [] } = context;
+    const element = document.createElement('blockquote');
+    element.classList.add('blockquote');
+
+    if (Array.isArray(node.content)) {
+      node.content.forEach((child, index) => {
+        const wrapper = document.createElement('div');
+        wrapper.classList.add('blockquote-line');
+
+        const syntaxElement = document.createElement('span');
+        syntaxElement.classList.add('syntax', 'blockquote-syntax');
+        syntaxElement.textContent = '> ';
+
+        this.syntaxElements.set(syntaxElement, {
+          type: 'blockquote',
+          path: [...path, index]
+        });
+
+        wrapper.appendChild(syntaxElement);
+
+        const childElement = this.renderNode(child, {
+          path: [...path, index]
+        });
+        if (childElement) {
+          wrapper.appendChild(childElement);
+        }
+
+        element.appendChild(wrapper);
+      });
+    }
+
+    this.nodeElements.set(node, element);
+    return element;
+  }
+
+  /**        
+    * Renders a ordered list.
+    * @param {DocNode} node - The ordered list to render.
+    * @param {object} context - The rendering context.
+    * @returns {HTMLElement} The rendered heading element. 
+ */
+  renderOrderedList(node, context) {
+    const { path = [] } = context;
+    const element = document.createElement('ol');
+    element.classList.add('ordered-list');
+
+    if (Array.isArray(node.content)) {
+      node.content.forEach((child, index) => {
+        const childElement = this.renderNode(child, {
+          path: [...path, index]
+        });
+        if (childElement) {
+          element.appendChild(childElement);
+        }
+      });
+    }
+
+    this.nodeElements.set(node, element);
+    return element;
+  }
+
+  /**        
+    * Renders an unordered list.
+    * @param {DocNode} node - The unordered list to render.
+    * @param {object} context - The rendering context.
+    * @returns {HTMLElement} The rendered heading element. 
+ */
+  renderListItem(node, context) {
+    const { path = [] } = context;
+    const element = document.createElement('li');
+    element.classList.add('list-item');
+
+    const parentPath = path.slice(0, -1);
+    const syntaxElement = document.createElement('span');
+    syntaxElement.classList.add('syntax', 'list-syntax');
+
+    this.syntaxElements.set(syntaxElement, {
+      type: 'list_item',
+      path: path
+    });
+
+    element.appendChild(syntaxElement);
+
+    if (Array.isArray(node.content)) {
+      node.content.forEach((child, index) => {
+        const childElement = this.renderNode(child, {
+          path: [...path, index]
+        });
+        if (childElement) {
+          element.appendChild(childElement);
+        }
+      });
+    }
+
+    this.nodeElements.set(node, element);
+    return element;
+  }
+
+
+  /**        
+      * Renders an image.
+      * @param {DocNode} node - The image to render.
+      * @param {object} context - The rendering context.
+      * @returns {HTMLElement} The rendered heading element. 
+   */
+  renderImage(node, context) {
+    const { path = [] } = context;
+    const wrapper = document.createElement('span');
+    wrapper.classList.add('image-wrapper');
+
+    if (this.shouldShowSyntax(path)) {
+      const syntaxElement = document.createElement('span');
+      syntaxElement.classList.add('syntax', 'image-syntax');
+      syntaxElement.textContent = `![${node.attrs.alt || ''}](${node.attrs.src}${node.attrs.title ? ` "${node.attrs.title}"` : ''})`;
+
+      this.syntaxElements.set(syntaxElement, {
+        type: 'image',
+        path: path
+      });
+
+      wrapper.appendChild(syntaxElement);
+    } else {
+      const img = document.createElement('img');
+      img.src = node.attrs.src;
+      img.alt = node.attrs.alt || '';
+      if (node.attrs.title) {
+        img.title = node.attrs.title;
+      }
+      img.classList.add('image');
+      wrapper.appendChild(img);
+    }
+
+    this.nodeElements.set(node, wrapper);
+    return wrapper;
+  }
+
+
+  /**        
+      * Renders a horizontal rule.
+      * @param {DocNode} node - The horizonal rule to render.
+      * @param {object} context - The rendering context.
+      * @returns {HTMLElement} The rendered heading element. 
+   */
+  renderHorizontalRule(node, context = {}) {
+    const { path = [] } = context;
+    const wrapper = document.createElement('div');
+    wrapper.classList.add('horizontal-rule-wrapper');
+
+    if (this.shouldShowSyntax(path)) {
+      const syntaxElement = document.createElement('span');
+      syntaxElement.classList.add('syntax', 'hr-syntax');
+      syntaxElement.textContent = '---';
+
+      this.syntaxElements.set(syntaxElement, {
+        type: 'horizontal_rule',
+        path: path
+      });
+
+      wrapper.appendChild(syntaxElement);
+    } else {
+      const hr = document.createElement('hr');
+      hr.classList.add('horizontal-rule');
+      wrapper.appendChild(hr);
+    }
+
+    this.nodeElements.set(node, wrapper);
+    return wrapper;
+  }
+
+  /**
+   * Updates the visibility of syntax elements based on cursor position and selection.
+   */
+  updateSyntaxVisibility() { }
 }
 
+const MD = `
+# heading
+asldfhadsj [asdf](https://x.com)
+
+> blockquote
+
+\`\`\`js
+console.log("Hello, world!");
+\`\`\`
+`
+
 console.log("hello")
+const parser = new MarkdownParser();
+const doc = parser.parse(MD);
+
+const container = document.createElement('div');
+
+const renderer = new MarkdownRenderer();
+renderer.render(doc, container);
+
+console.log(container.innerHTML);
