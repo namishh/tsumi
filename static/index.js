@@ -150,6 +150,377 @@ class Doc {
   static empty() {
     return new Doc([DocNode.paragraph()]);
   }
+
+  static fromMarkdown(markdown) {
+    return new MarkdownParser().parse(markdown);
+  }
+
+  nodeSize() {
+    return this.content.reduce((size, node) => size + node.nodeSize(), 0);
+  }
+
+  textContent() {
+    return this.content.map(node => node.textContent()).join("\n");
+  }
+
+  nodeAt(pos) {
+    let currentPos = 0;
+
+    for (let i = 0; i < this.content.length; i++) {
+      const node = this.content[i];
+      const nodeSize = node.nodeSize();
+
+      if (currentPos + nodeSize > pos) {
+        if (node.isText()) {
+          return {
+            node,
+            offset: pos - currentPos,
+            path: [i],
+            parent: this
+          };
+        } else if (Array.isArray(node.content)) {
+          const result = this.findInNode(node, pos - currentPos, [i]);
+          if (result) {
+            result.parent = this;
+            return result;
+          }
+        }
+      }
+
+      currentPos += nodeSize;
+    }
+
+    return null;
+  }
+
+  // find a node at a specific position within a node
+  findInNode(node, pos, path = []) {
+    let currentPos = 0;
+
+    for (let i = 0; i < node.content.length; i++) {
+      const child = node.content[i];
+      const childSize = child.nodeSize();
+
+      if (currentPos + childSize > pos) {
+        if (child.isText()) {
+          return {
+            node: child,
+            offset: pos - currentPos,
+            parent: node,
+            path: [...path, i]
+          }
+        } else if (Array.isArray(child.content)) {
+          return this.findInNode(child, pos - currentPos, [...path, i]);
+        }
+      }
+      currentPos += childSize;
+    }
+
+    return {
+      node: node,
+      offset: pos,
+      path: path
+    }
+  }
+
+  clone() {
+    return new Doc(this.content.map(node => node.clone()));
+  }
+
+  // insert content at a specific position
+  insert(pos, content) {
+    const result = this.nodeAt(pos);
+    if (!result) {
+      // at the end 
+      const newContent = [...this.content];
+      if (typeof content === "string") {
+        newContent.push(DocNode.paragraph([DocNode.text(content)]));
+      } else {
+        newContent.push(content);
+      }
+
+      return new Doc(newContent);
+    }
+
+    const newDoc = this.clone();
+    const { node, offset, path } = result;
+
+    if (node.isText()) {
+      const newText = node.content.slice(0, offset) + content + node.content.slice(offset);
+      node.content = newText;
+    } else {
+      if (typeof content === 'string') {
+        parent.content.splice(path[path.length - 1], 0, DocNode.text(content));
+      } else {
+        parent.content.splice(path[path.length - 1], 0, content);
+      }
+    }
+
+    return newDoc;
+  }
+
+  delete(from, to) {
+    if (from >= to) return this.clone();
+
+    const newDoc = this.clone();
+    const fromResult = newDoc.nodeAt(from);
+    const toResult = newDoc.nodeAt(to);
+
+    if (!fromResult || !toResult) return newDoc;
+
+    if (fromResult.node === toResult.node && fromResult.node.isText()) {
+      const node = fromResult.node;
+      node.content = node.content.slice(0, fromResult.offset) +
+        node.content.slice(toResult.offset);
+      return newDoc;
+    }
+
+
+    // TODO: HANDLE DELETION ACROSS MULTIPLE NODES
+    return newDoc;
+  }
+
+  replace(from, to, content) {
+    return this.delete(from, to).insert(from, content);
+  }
+
+  split(pos) {
+    const result = this.nodeAt(pos);
+    if (!result || !result.node.isText()) return this.clone();
+
+    const newDoc = this.clone();
+    const { node, offset, parent, path } = result;
+
+    if (offset === 0 || offset === node.content.length) {
+      return newDoc;
+    }
+
+    const leftText = node.content.slice(0, offset);
+    const rightText = node.content.slice(offset);
+
+    node.content = leftText;
+    const rightNode = DocNode.text(rightText);
+
+    parent.content.splice(path[path.length - 1] + 1, 0, rightNode);
+
+    return newDoc;
+  }
+
+  join(pos) {
+    const result = this.nodeAt(pos);
+    if (!result) return this.clone();
+
+    const newDoc = this.clone();
+    const { parent, path } = result;
+    const nodeIndex = path[path.length - 1];
+
+    if (nodeIndex === 0 || nodeIndex >= parent.content.length - 1) {
+      return newDoc; // Cannot join
+    }
+
+    const leftNode = parent.content[nodeIndex - 1];
+    const rightNode = parent.content[nodeIndex];
+
+    if (leftNode.isText() && rightNode.isText()) {
+      // Join text nodes
+      leftNode.content += rightNode.content;
+      parent.content.splice(nodeIndex, 1);
+    }
+
+    return newDoc;
+  }
+
+  toJSON() {
+    return {
+      type: 'doc',
+      content: this.content.map(node => node.toJSON())
+    };
+  }
+
+  static fromJSON(json) {
+    const content = json.content ? json.content.map(nodeJSON => DocNode.fromJSON(nodeJSON)) : [];
+    return new Doc(content);
+  }
+
+  findNodesByType(type) {
+    const nodes = [];
+
+    const traverse = (node, path = []) => {
+      if (node.type === type) {
+        nodes.push({ node, path });
+      }
+
+      if (Array.isArray(node.content)) {
+        node.content.forEach((child, index) => {
+          traverse(child, [...path, index]);
+        });
+      }
+    };
+
+    this.content.forEach((node, index) => {
+      traverse(node, [index]);
+    });
+    return nodes;
+  }
+
+  firstChild() {
+    return this.content[0] || null;
+  }
+
+  lastChild() {
+    return this.content[this.content.length - 1] || null;
+  }
+
+  /**
+   * Check if the document is empty
+   */
+  isEmpty() {
+    if (this.content.length === 0) {
+      return true;
+    }
+
+    if (this.content.length === 1) {
+      const firstNode = this.content[0];
+      if (firstNode.type === 'paragraph' && Array.isArray(firstNode.content)) {
+        if (firstNode.content.length === 0) {
+          return true;
+        }
+        if (firstNode.content.length === 1 && firstNode.content[0].isText() && !firstNode.content[0].content) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Validate the document structure
+   */
+  validate() {
+    // Check that all nodes are valid
+    const errors = [];
+
+    const validateNode = (node, path = []) => {
+      if (!node.type) {
+        errors.push(`Node at ${path.join('.')} has no type`);
+      }
+
+      if (Array.isArray(node.content)) {
+        node.content.forEach((child, index) => {
+          validateNode(child, [...path, index]);
+        });
+      }
+    };
+
+    this.content.forEach((node, index) => {
+      validateNode(node, [index]);
+    });
+
+    return errors;
+  }
+
+  getPositionByPath(path) {
+    let pos = 0;
+    let current = this;
+
+    for (let i = 0; i < path.length; i++) {
+      const index = path[i];
+
+      for (let j = 0; j < index; j++) {
+        pos += current.content[j].nodeSize();
+      }
+
+      if (i < path.length - 1) {
+        current = current.content[index];
+      }
+    }
+
+    return pos;
+  }
+
+  getPathByPosition(pos) {
+    const result = this.nodeAt(pos);
+    return result ? result.path : [];
+  }
+
+  forEachTextNode(callback) {
+    const traverse = (node, path = []) => {
+      if (node.isText()) {
+        callback(node, path);
+      } else if (Array.isArray(node.content)) {
+        node.content.forEach((child, index) => {
+          traverse(child, [...path, index]);
+        });
+      }
+    };
+
+    this.content.forEach((node, index) => {
+      traverse(node, [index]);
+    });
+  }
+
+  getLineColumn(pos) {
+    const text = this.textContent();
+    const beforePos = text.slice(0, pos);
+    const lines = beforePos.split('\n');
+
+    return {
+      line: lines.length,
+      column: lines[lines.length - 1].length + 1
+    };
+  }
+
+  getPositionFromLineColumn(line, column) {
+    const text = this.textContent();
+    const lines = text.split('\n');
+
+    if (line > lines.length) {
+      return text.length;
+    }
+
+    let pos = 0;
+    for (let i = 0; i < line - 1; i++) {
+      pos += lines[i].length + 1; // +1 for newline
+    }
+
+    pos += Math.min(column - 1, lines[line - 1].length);
+    return pos;
+  }
+
+  getNodeAtPath(path) {
+    let currentNode = { content: this.content };
+    for (let i = 0; i < path.length; i++) {
+      const index = path[i];
+      if (!currentNode.content || index >= currentNode.content.length) {
+        return null;
+      }
+      currentNode = currentNode.content[index];
+    }
+    return currentNode;
+  }
+
+  getPositionOfNode(targetNode) {
+    let position = 0;
+    const traverse = (nodes) => {
+      for (const node of nodes) {
+        if (node === targetNode) {
+          return position;
+        }
+        if (node.isText()) {
+          position += node.content.length;
+        } else if (Array.isArray(node.content)) {
+          const foundPos = traverse(node.content);
+          if (foundPos !== -1) {
+            return foundPos;
+          }
+        }
+      }
+      return -1; // Not found in this branch
+    };
+    return traverse(this.content);
+  }
+
 }
 
 // :: MARK
@@ -731,22 +1102,33 @@ class MarkdownParser {
 
 }
 
-const MD = `
-# Heading 1
-\`\`\`javascript
-console.log("Hello, World!");
-\`\`\`
-# Heading 2
-## Subheading
-\`\`\`python
-print("Hello, Python!")
-\`\`\`
-`
 
-console.time('myTimer');
-const parser = new MarkdownParser();
-const doc = parser.parse(MD);
-console.timeEnd('myTimer');
-console.log(doc);
+// :: RENDERER
+
+class MarkdownRenderer {
+  constructor(options = {}) {
+    this.cursorPosition = options.cursorPosition || null;
+    this.selection = options.selection || null;
+    this.syntaxElements = new Map() // track syntax elements for showing/hiding
+    this.nodeElements = new Map()
+  }
+
+  render(doc, container, cursorPosition = null, selection = null) {
+    this.cursorPosition = cursorPosition;
+    this.selection = selection;
+
+    if (!container) {
+      throw new Error("Container element is required for rendering.");
+    }
+
+    container.innerHTML = '';
+    this.syntaxElements.clear();
+    this.nodeElements.clear();
+
+    doc.content.forEach((node, index) => {
+      // TODO TODO TODO TODO TODO
+    })
+  }
+}
 
 console.log("hello")
