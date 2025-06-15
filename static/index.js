@@ -1457,13 +1457,15 @@ class MarkdownParser {
 class MarkdownRenderer {
   /**
    * Initializes the renderer.
+   * @param {Editor} editor - The editor instance.
    * @param {Object} [options={}] - Rendering options.
    */
-  constructor(options = {}) {
+  constructor(editor, options = {}) {
     this.cursorPosition = options.cursorPosition || null;
     this.selection = options.selection || null;
     this.syntaxElements = new Map() // track syntax elements for showing/hiding
     this.nodeElements = new Map()
+    this.editor = editor;
   }
 
   /**
@@ -1897,7 +1899,80 @@ class MarkdownRenderer {
   /**
    * Updates the visibility of syntax elements based on cursor position and selection.
    */
-  updateSyntaxVisibility() { }
+  updateSyntaxVisibility() {
+    this.syntaxElements.forEach((info, element) => {
+      const shouldShow = this.shouldShowSyntax(info.path);
+      element.style.display = shouldShow ? 'inline' : 'none';
+    });
+  }
+
+  /** 
+   * Checks if syntax should be shown for a given path.
+   * @param {Array<number>} path - The path to check.
+   * @return {boolean} True if syntax should be shown, false otherwise.
+   */
+  shouldShowSyntax(path) {
+    if (this.cursorPosition === null) {
+      return false;
+    }
+
+    const node = this.editor.doc.getNodeAtPath(path);
+    if (!node) return false;
+
+    const nodeStart = this.editor.doc.getNodeStartPosition(node);
+    const nodeEnd = nodeStart + node.nodeSize()
+    if (this.cursorPosition >= nodeStart && this.cursorPosition <= nodeEnd) {
+      return true;
+    }
+
+    // TODO: Check if selection intersects with the node and if it does, show syntax
+  }
+
+  /**
+   * Set cursor position for syntax visibility.
+    * @param {number} position - The cursor position.
+   */
+  setCursorPosition(position) {
+    this.cursorPosition = position;
+    this.updateSyntaxVisibility();
+  }
+
+  /**
+   * Set selection for syntax visibility.
+   * @param {Object} selection - The selection object.
+   */
+  setSelection(selection) {
+    this.selection = selection;
+    this.updateSyntaxVisibility();
+  }
+}
+
+// :: SELECTION
+
+
+// :: CURSOR
+
+// :: TRANSACTION
+
+class Editor {
+  constructor(element) {
+    this.element = element;
+    this.parser = new MarkdownParser();
+    this.doc = Doc.empty();
+
+    this.init()
+  }
+
+  init() {
+    this.renderer = new MarkdownRenderer(this);
+  }
+
+  example(markdown_string) {
+    this.doc = this.parser.parse(markdown_string);
+    let rendered = this.renderer.render(this.doc, this.element, null, null);
+
+    console.log(rendered.outerHTML);
+  }
 }
 
 const MD = `
@@ -1909,15 +1984,11 @@ asldfhadsj [asdf](https://x.com)
 \`\`\`js
 console.log("Hello, world!");
 \`\`\`
+
+---
 `
 
-console.log("hello")
-const parser = new MarkdownParser();
-const doc = parser.parse(MD);
+const newdiv = document.createElement("div");
 
-const container = document.createElement('div');
-
-const renderer = new MarkdownRenderer();
-renderer.render(doc, container);
-
-console.log(container.innerHTML);
+const editor = new Editor(newdiv);
+editor.example(MD);
