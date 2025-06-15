@@ -88,7 +88,7 @@ class DocNode {
   }
 
   clone() {
-    const cloned = new Node(this.type, null, { ...this.attrs });
+    const cloned = new DocNode(this.type, null, { ...this.attrs });
 
     if (this.isText()) {
       cloned.content = this.content;
@@ -340,12 +340,21 @@ class MarkdownParser {
       whitespace: /\s+/g
     }
 
+    this.patterns = {
+      heading: /^(#{1,6})\s+(.+)$/,
+      codeBlockStart: /^```(\w+)?$/,
+      codeBlockEnd: /^```$/,
+      blockquote: /^>\s*/,
+      orderedList: /^(\d+)\.\s+(.+)$/,
+      bulletList: /^[-*+]\s+(.+)$/,
+      horizontalRule: /^(-{3,}|\*{3,}|_{3,})$/,
+    };
+
 
     this.blockRules = [
-      // HEADINGS 1-6
       {
         test: (line) => {
-          const match = line.match(/^(#{1,6})\s+(.+)$/);
+          const match = line.match(this.patterns.heading);
           if (match) {
             return {
               block: {
@@ -363,13 +372,13 @@ class MarkdownParser {
       // CODE BLOCKS 
       {
         test: (line, lines, index) => {
-          const match = line.match(/^```(\w+)?$/);
+          const match = line.match(this.patterns.codeBlockStart);
           if (match) {
             const language = match[1] || null;
             const content = [];
             let i = index + 1;
 
-            while (i < lines.length && !lines[i].match(/^```$/)) {
+            while (i < lines.length && !lines[i].match(this.patterns.codeBlockEnd)) {
               content.push(lines[i]);
               i++;
             }
@@ -390,12 +399,12 @@ class MarkdownParser {
       // BLOCK QUOTES
       {
         test: (line, lines, index) => {
-          if (line.match(/^>\s*/)) {
+          if (line.match(this.patterns.blockquote)) {
             const content = [];
             let i = index;
 
-            while (i < lines.length && lines[i].match(/^>\s*/)) {
-              content.push(lines[i].replace(/^>\s*/, ''));
+            while (i < lines.length && lines[i].match(this.patterns.blockquote)) {
+              content.push(lines[i].replace(this.patterns.blockquote, ''));
               i++;
             }
 
@@ -414,13 +423,13 @@ class MarkdownParser {
       // ORDERED LISTS
       {
         test: (line, lines, index) => {
-          const match = line.match(/^(\d+)\.\s+(.+)$/);
+          const match = line.match(this.patterns.orderedList);
           if (match) {
             const items = [];
             let i = index;
 
             while (i < lines.length) {
-              const itemMatch = lines[i].match(/^(\d+)\.\s+(.+)$/);
+              const itemMatch = lines[i].match(this.patterns.orderedList);
               if (itemMatch) {
                 items.push(itemMatch[2]);
                 i++;
@@ -447,13 +456,13 @@ class MarkdownParser {
       // UNORDERED LISTS
       {
         test: (line, lines, index) => {
-          const match = line.match(/^[-*+]\s+(.+)$/);
+          const match = line.match(this.patterns.bulletList);
           if (match) {
             const items = [];
             let i = index;
 
             while (i < lines.length) {
-              const itemMatch = lines[i].match(/^[-*+]\s+(.+)$/);
+              const itemMatch = lines[i].match(this.patterns.bulletList);
               if (itemMatch) {
                 items.push(itemMatch[1]);
                 i++;
@@ -476,10 +485,11 @@ class MarkdownParser {
           return null;
         }
       },
+
       // HORIZONTAL RULE
       {
         test: (line) => {
-          if (line.match(/^(-{3,}|\*{3,}|_{3,})$/)) {
+          if (line.match(this.patterns.horizontalRule)) {
             return {
               block: {
                 type: 'horizontal_rule'
@@ -490,148 +500,23 @@ class MarkdownParser {
           return null;
         }
       }
-    ]
-
-    this.inlineRules = [
-      // BOLD
-      {
-        test: (text, pos) => {
-          const match = text.slice(pos).match(/^\*\*([^*]+)\*\*/);
-          if (match) {
-            return {
-              start: pos,
-              end: pos + match[0].length,
-              token: {
-                type: "bold",
-                content: match[1]
-              }
-            }
-          }
-          return null;
-        },
-        findNext: (text, pos) => {
-          const index = text.indexOf("**", pos);
-          return index
-        }
-      },
-      // ITALIC
-      {
-        test: (text, pos) => {
-          const match = text.slice(pos).match(/^\*([^*]+)\*/);
-          if (match) {
-            return {
-              start: pos,
-              end: pos + match[0].length,
-              token: {
-                type: 'italic',
-                content: match[1]
-              }
-            };
-          }
-          return null;
-        },
-        findNext: (text, pos) => {
-          let index = pos;
-          while (index < text.length) {
-            index = text.indexOf('*', index);
-            if (index === -1) return -1;
-
-            // Check if it's not part of **
-            if (text[index + 1] !== '*' && text[index - 1] !== '*') {
-              return index;
-            }
-            index++;
-          }
-          return -1;
-        }
-      },
-      // LINKS
-      {
-        test: (text, pos) => {
-          const match = text.slice(pos).match(/^\[([^\]]+)\]\(([^)]+)\)/);
-          if (match) {
-            const [, linkText, href] = match;
-            const parts = href.split(' ');
-            const url = parts[0];
-            const title = parts.slice(1).join(' ').replace(/^["']|["']$/g, '');
-
-            return {
-              start: pos,
-              end: pos + match[0].length,
-              token: {
-                type: 'link',
-                text: linkText,
-                href: url,
-                title: title
-              }
-            };
-          }
-          return null;
-        },
-        findNext: (text, pos) => {
-          return text.indexOf('[', pos);
-        }
-      },
-
-      // IMAGES
-      {
-        test: (text, pos) => {
-          const match = text.slice(pos).match(/^!\[([^\]]*)\]\(([^)]+)\)/);
-          if (match) {
-            const [, alt, src] = match;
-            const parts = src.split(' ');
-            const url = parts[0];
-            const title = parts.slice(1).join(' ').replace(/^["']|["']$/g, '');
-
-            return {
-              start: pos,
-              end: pos + match[0].length,
-              token: {
-                type: 'image',
-                alt: alt,
-                src: url,
-                title: title
-              }
-            };
-          }
-          return null;
-        },
-        findNext: (text, pos) => {
-          return text.indexOf('![', pos);
-        }
-      },
-      // STRIKETHROUGH
-      {
-        test: (text, pos) => {
-          const match = text.slice(pos).match(/^~~([^~]+)~~/);
-          if (match) {
-            return {
-              start: pos,
-              end: pos + match[0].length,
-              token: {
-                type: 'strikethrough',
-                content: match[1]
-              }
-            };
-          }
-          return null;
-        },
-        findNext: (text, pos) => {
-          return text.indexOf('~~', pos);
-        }
-      }
-    ]
+    ];
   }
 
   parse(markdown) {
     if (typeof markdown !== "string") {
-      return Doc.empty(); // TODO: actually make a Doc object
+      return Doc.empty();
+    }
+    const lines = markdown.replace(/\r\n?/g, '\n').split('\n');
+    const blocks = this.parseBlocks(lines);
+    const nodes = [];
+
+    for (const block of blocks) {
+      const node = this.blockToNode(block);
+      if (node !== null) nodes.push(node);
     }
 
-    const normalizedText = markdown.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-    const blocks = this.parseBlocks(normalizedText);
-    const nodes = blocks.map(block => this.blockToNode(block));
-    return new Doc(nodes.filter(node => node !== null));
+    return new Doc(nodes);
   }
 
   matchBlockRule(line, lines, index) {
@@ -645,7 +530,6 @@ class MarkdownParser {
   }
 
   parseInlineContent(text) {
-    console.log("parseInlineContent", text);
     if (!text || typeof text !== 'string') {
       return [DocNode.text('')];
     }
@@ -712,53 +596,62 @@ class MarkdownParser {
   tokenizeInline(text) {
     const tokens = [];
     let pos = 0;
+    const textLength = text.length;
 
-    while (pos < text.length) {
-      let matched = false;
+    const combinedPattern = /(\*\*([^*]+)\*\*|\*([^*]+)\*|~~([^~]+)~~|\[([^\]]+)\]\(([^)]+)\)|!\[([^\]]*)\]\(([^)]+)\)|`([^`]+)`)/g;
 
-      for (const rule of this.inlineRules) {
-        const match = rule.test(text, pos);
-        if (match) {
-          if (match.start > pos) {
-            tokens.push({
-              type: 'text',
-              content: text.slice(pos, match.start)
-            });
-          }
+    let match;
+    let lastIndex = 0;
 
-          tokens.push(match.token);
-          pos = match.end;
-          matched = true;
-          break;
-        }
-      }
-
-      if (!matched) {
-        // no rule matched, advance by one character
-        const nextRulePos = this.findNextRulePosition(text, pos + 1);
+    while ((match = combinedPattern.exec(text)) !== null) {
+      if (match.index > lastIndex) {
         tokens.push({
           type: 'text',
-          content: text.slice(pos, nextRulePos)
+          content: text.slice(lastIndex, match.index)
         });
-        pos = nextRulePos;
       }
+
+      if (match[2]) { // bold **text**
+        tokens.push({ type: 'bold', content: match[2] });
+      } else if (match[3]) { // italic *text*
+        tokens.push({ type: 'italic', content: match[3] });
+      } else if (match[4]) { // strikethrough ~~text~~
+        tokens.push({ type: 'strikethrough', content: match[4] });
+      } else if (match[5] && match[6]) { // link [text](url)
+        const parts = match[6].split(' ');
+        tokens.push({
+          type: 'link',
+          text: match[5],
+          href: parts[0],
+          title: parts.slice(1).join(' ').replace(/^["']|["']$/g, '')
+        });
+      } else if (match[7] && match[8]) { // image ![alt](src)
+        const parts = match[8].split(' ');
+        tokens.push({
+          type: 'image',
+          alt: match[7],
+          src: parts[0],
+          title: parts.slice(1).join(' ').replace(/^["']|["']$/g, '')
+        });
+      } else if (match[9]) { // code `text`
+        tokens.push({ type: 'code', content: match[9] });
+      }
+
+      lastIndex = match.index + match[0].length;
+    }
+
+    // add remaining text
+    if (lastIndex < textLength) {
+      tokens.push({
+        type: 'text',
+        content: text.slice(lastIndex)
+      });
     }
 
     return tokens;
   }
 
-  findNextRulePosition(text, startPos) {
-    let minPos = text.length;
 
-    for (const rule of this.inlineRules) {
-      const pos = rule.findNext(text, startPos);
-      if (pos !== -1 && pos < minPos) {
-        minPos = pos;
-      }
-    }
-
-    return minPos;
-  }
   blockToNode(block) {
     switch (block.type) {
       case 'heading':
@@ -797,60 +690,40 @@ class MarkdownParser {
     }
   }
 
-  parseBlocks(text) {
-    const lines = text.split('\n');
+  parseBlocks(lines) {
     const blocks = [];
-    let currentBlock = [];
-    let i = 0
+    let i = 0;
 
     while (i < lines.length) {
       const line = lines[i];
-      const trimmedLine = line.trim();
-      if (!trimmedLine && !currentBlock) {
+
+      if (!line.trim() && blocks.length === 0) {
         i++;
         continue;
       }
 
       const blockMatch = this.matchBlockRule(line, lines, i);
       if (blockMatch) {
-        if (currentBlock) {
-          blocks.push(currentBlock);
-          currentBlock = null;
-        }
-
         blocks.push(blockMatch.block);
         i += blockMatch.consumed;
-      } else if (!trimmedLine) {
-        // empty lines, end of current block
-        if (currentBlock) {
-          blocks.push(currentBlock);
-          currentBlock = null;
-        }
       } else {
-        // regular line. add to current paragraph
-        if (!currentBlock) {
-          currentBlock = {
-            type: 'paragraph',
-            content: []
-          }
+        const paragraphLines = [];
+        while (i < lines.length && lines[i].trim() && !this.matchBlockRule(lines[i], lines, i)) {
+          paragraphLines.push(lines[i]);
+          i++;
         }
 
-        if (currentBlock.type === 'paragraph') {
-          currentBlock.content.push(line);
-        } else {
-          blocks.push(currentBlock);
-          currentBlock = {
+        if (paragraphLines.length > 0) {
+          blocks.push({
             type: 'paragraph',
-            content: [line]
-          };
+            content: paragraphLines
+          });
         }
 
-        i++
+        if (i < lines.length && !lines[i].trim()) {
+          i++;
+        }
       }
-    }
-
-    if (currentBlock) {
-      blocks.push(currentBlock);
     }
 
     return blocks;
@@ -859,28 +732,21 @@ class MarkdownParser {
 }
 
 const MD = `
-# h1
-
-## h2
-
-**ASDFDS** is *sdlfahdfj* to \`dslfasdfkj\`
-
-\`\`\`js
-console.log("Hello, world!");
+# Heading 1
+\`\`\`javascript
+console.log("Hello, World!");
 \`\`\`
-
-> This is a blockquote
-> with multiple *lines*
-
-[Link](https://example.com)
-
----
-
-![Image](https://example.com/image.png)
+# Heading 2
+## Subheading
+\`\`\`python
+print("Hello, Python!")
+\`\`\`
 `
 
+console.time('myTimer');
 const parser = new MarkdownParser();
 const doc = parser.parse(MD);
+console.timeEnd('myTimer');
 console.log(doc);
 
 console.log("hello")
