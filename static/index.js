@@ -152,6 +152,185 @@ class Doc {
   }
 }
 
+// :: MARK
+// represents inline formatting like bold, italic, etc. applied to text nodes to
+// provide styling
+
+class Mark {
+  constructor(type, attrs = {}) {
+    this.type = type;
+    this.attrs = attrs;
+  }
+
+  static bold() {
+    return new Mark("bold");
+  }
+
+  static italic() {
+    return new Mark("italic");
+  }
+
+  // inline code 
+  static code() {
+    return new Mark("code");
+  }
+
+  static link(href, title = "") {
+    return new Mark("link", { href, title });
+  }
+
+  static strikethrough() {
+    return new Mark("strikethrough");
+  }
+
+  eq(other) {
+    if (this.type !== other.type) {
+      return false;
+    }
+
+    const thisAttrs = this.attrs || {};
+    const otherAttrs = other.attrs || {};
+
+    const thisKeys = Object.keys(thisAttrs);
+    const otherKeys = Object.keys(otherAttrs);
+
+    if (thisKeys.length !== otherKeys.length) {
+      return false;
+    }
+
+    for (const key of thisKeys) {
+      if (thisAttrs[key] !== otherAttrs[key]) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  clone() {
+    return new Mark(this.type, { ...this.attrs });
+  }
+
+  toJSON() {
+    const json = {
+      type: this.type
+    };
+
+    if (Object.keys(this.attrs).length > 0) {
+      json.attrs = this.attrs;
+    }
+
+    return json;
+  }
+
+  static fromJSON(json) {
+    return new Mark(json.type, json.attrs || {});
+  }
+
+  getCSSClass() {
+    switch (this.type) {
+      case 'bold':
+        return 'bold';
+      case 'italic':
+        return 'italic';
+      case 'code':
+        return 'inline-code';
+      case 'link':
+        return 'link';
+      case 'strikethrough':
+        return 'strikethrough';
+      default:
+        return '';
+    }
+  }
+
+  getHTMLAttrs() {
+    const attrs = {};
+
+    switch (this.type) {
+      case 'link':
+        attrs.href = this.attrs.href || '#';
+        if (this.attrs.title) {
+          attrs.title = this.attrs.title;
+        }
+        break;
+    }
+
+    return attrs;
+  }
+
+  getHTMLTag() {
+    switch (this.type) {
+      case 'bold':
+        return 'strong';
+      case 'italic':
+        return 'em';
+      case 'code':
+        return 'code';
+      case 'link':
+        return 'a';
+      case 'strikethrough':
+        return 'del';
+      default:
+        return 'span';
+    }
+  }
+}
+
+// MarkSet class represents a collection of marks
+// Used to efficiently manage and compare sets of marks
+class MarkSet {
+  constructor(marks = []) {
+    this.marks = marks;
+  }
+
+  add(mark) {
+    for (const existing of this.marks) {
+      if (existing.eq(mark)) {
+        return this;
+      }
+    }
+
+    return new MarkSet([...this.marks, mark]);
+  }
+
+  remove(mark) {
+    const filtered = this.marks.filter(existing => !existing.eq(mark));
+    return new MarkSet(filtered);
+  }
+
+  contains(mark) {
+    return this.marks.some(existing => existing.eq(mark));
+  }
+
+  eq(other) {
+    if (this.marks.length !== other.marks.length) {
+      return false;
+    }
+
+    for (const mark of this.marks) {
+      if (!other.contains(mark)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  toArray() {
+    return [...this.marks];
+  }
+
+  static empty() {
+    return new MarkSet([]);
+  }
+
+  static from(marks) {
+    return new MarkSet(marks);
+  }
+}
+
+
 // :: PARSER
 class MarkdownParser {
   constructor() {
@@ -180,6 +359,137 @@ class MarkdownParser {
           return null;
         }
       },
+
+      // CODE BLOCKS 
+      {
+        test: (line, lines, index) => {
+          const match = line.match(/^```(\w+)?$/);
+          if (match) {
+            const language = match[1] || null;
+            const content = [];
+            let i = index + 1;
+
+            while (i < lines.length && !lines[i].match(/^```$/)) {
+              content.push(lines[i]);
+              i++;
+            }
+
+            return {
+              block: {
+                type: 'code_block',
+                language: language,
+                content: content.join('\n')
+              },
+              consumed: i - index + 1
+            };
+          }
+          return null;
+        }
+      },
+
+      // BLOCK QUOTES
+      {
+        test: (line, lines, index) => {
+          if (line.match(/^>\s*/)) {
+            const content = [];
+            let i = index;
+
+            while (i < lines.length && lines[i].match(/^>\s*/)) {
+              content.push(lines[i].replace(/^>\s*/, ''));
+              i++;
+            }
+
+            return {
+              block: {
+                type: 'blockquote',
+                content: content
+              },
+              consumed: i - index
+            };
+          }
+          return null;
+        }
+      },
+
+      // ORDERED LISTS
+      {
+        test: (line, lines, index) => {
+          const match = line.match(/^(\d+)\.\s+(.+)$/);
+          if (match) {
+            const items = [];
+            let i = index;
+
+            while (i < lines.length) {
+              const itemMatch = lines[i].match(/^(\d+)\.\s+(.+)$/);
+              if (itemMatch) {
+                items.push(itemMatch[2]);
+                i++;
+              } else if (lines[i].trim() === '') {
+                i++;
+                break;
+              } else {
+                break;
+              }
+            }
+
+            return {
+              block: {
+                type: 'ordered_list',
+                items: items
+              },
+              consumed: i - index
+            };
+          }
+          return null;
+        }
+      },
+
+      // UNORDERED LISTS
+      {
+        test: (line, lines, index) => {
+          const match = line.match(/^[-*+]\s+(.+)$/);
+          if (match) {
+            const items = [];
+            let i = index;
+
+            while (i < lines.length) {
+              const itemMatch = lines[i].match(/^[-*+]\s+(.+)$/);
+              if (itemMatch) {
+                items.push(itemMatch[1]);
+                i++;
+              } else if (lines[i].trim() === '') {
+                i++;
+                break;
+              } else {
+                break;
+              }
+            }
+
+            return {
+              block: {
+                type: 'bullet_list',
+                items: items
+              },
+              consumed: i - index
+            };
+          }
+          return null;
+        }
+      },
+      // HORIZONTAL RULE
+      {
+        test: (line) => {
+          if (line.match(/^(-{3,}|\*{3,}|_{3,})$/)) {
+            return {
+              block: {
+                type: 'horizontal_rule'
+              },
+              consumed: 1
+            };
+          }
+          return null;
+        }
+      }
     ]
 
     this.inlineRules = [
@@ -202,6 +512,112 @@ class MarkdownParser {
         findNext: (text, pos) => {
           const index = text.indexOf("**", pos);
           return index
+        }
+      },
+      // ITALIC
+      {
+        test: (text, pos) => {
+          const match = text.slice(pos).match(/^\*([^*]+)\*/);
+          if (match) {
+            return {
+              start: pos,
+              end: pos + match[0].length,
+              token: {
+                type: 'italic',
+                content: match[1]
+              }
+            };
+          }
+          return null;
+        },
+        findNext: (text, pos) => {
+          let index = pos;
+          while (index < text.length) {
+            index = text.indexOf('*', index);
+            if (index === -1) return -1;
+
+            // Check if it's not part of **
+            if (text[index + 1] !== '*' && text[index - 1] !== '*') {
+              return index;
+            }
+            index++;
+          }
+          return -1;
+        }
+      },
+      // LINKS
+      {
+        test: (text, pos) => {
+          const match = text.slice(pos).match(/^\[([^\]]+)\]\(([^)]+)\)/);
+          if (match) {
+            const [, linkText, href] = match;
+            const parts = href.split(' ');
+            const url = parts[0];
+            const title = parts.slice(1).join(' ').replace(/^["']|["']$/g, '');
+
+            return {
+              start: pos,
+              end: pos + match[0].length,
+              token: {
+                type: 'link',
+                text: linkText,
+                href: url,
+                title: title
+              }
+            };
+          }
+          return null;
+        },
+        findNext: (text, pos) => {
+          return text.indexOf('[', pos);
+        }
+      },
+
+      // IMAGES
+      {
+        test: (text, pos) => {
+          const match = text.slice(pos).match(/^!\[([^\]]*)\]\(([^)]+)\)/);
+          if (match) {
+            const [, alt, src] = match;
+            const parts = src.split(' ');
+            const url = parts[0];
+            const title = parts.slice(1).join(' ').replace(/^["']|["']$/g, '');
+
+            return {
+              start: pos,
+              end: pos + match[0].length,
+              token: {
+                type: 'image',
+                alt: alt,
+                src: url,
+                title: title
+              }
+            };
+          }
+          return null;
+        },
+        findNext: (text, pos) => {
+          return text.indexOf('![', pos);
+        }
+      },
+      // STRIKETHROUGH
+      {
+        test: (text, pos) => {
+          const match = text.slice(pos).match(/^~~([^~]+)~~/);
+          if (match) {
+            return {
+              start: pos,
+              end: pos + match[0].length,
+              token: {
+                type: 'strikethrough',
+                content: match[1]
+              }
+            };
+          }
+          return null;
+        },
+        findNext: (text, pos) => {
+          return text.indexOf('~~', pos);
         }
       }
     ]
@@ -229,6 +645,7 @@ class MarkdownParser {
   }
 
   parseInlineContent(text) {
+    console.log("parseInlineContent", text);
     if (!text || typeof text !== 'string') {
       return [DocNode.text('')];
     }
@@ -248,6 +665,40 @@ class MarkdownParser {
           }
           break;
 
+        case 'bold':
+          const boldNode = DocNode.text(token.content);
+          boldNode.marks.push(Mark.bold());
+          nodes.push(boldNode);
+          break;
+
+        case 'italic':
+          const italicNode = DocNode.text(token.content);
+          italicNode.marks.push(Mark.italic());
+          nodes.push(italicNode);
+          break;
+
+        case 'code':
+          const codeNode = DocNode.text(token.content);
+          codeNode.marks.push(Mark.code());
+          nodes.push(codeNode);
+          break;
+
+        case 'link':
+          const linkNode = DocNode.text(token.text);
+          linkNode.marks.push(Mark.link(token.href, token.title));
+          nodes.push(linkNode);
+          break;
+
+        case 'image':
+          nodes.push(DocNode.image(token.src, token.alt, token.title));
+          break;
+
+        case 'strikethrough':
+          const strikeNode = DocNode.text(token.content);
+          strikeNode.marks.push(Mark.strikethrough());
+          nodes.push(strikeNode);
+          break;
+
         default:
           if (token.content) {
             nodes.push(DocNode.text(token.content));
@@ -257,7 +708,6 @@ class MarkdownParser {
 
     return nodes.length > 0 ? nodes : [DocNode.text('')];
   }
-
 
   tokenizeInline(text) {
     const tokens = [];
@@ -309,11 +759,39 @@ class MarkdownParser {
 
     return minPos;
   }
-
   blockToNode(block) {
     switch (block.type) {
       case 'heading':
         return DocNode.heading(block.level, this.parseInlineContent(block.content));
+
+      case 'code_block':
+        return DocNode.codeBlock([DocNode.text(block.content)], block.language);
+
+      case 'blockquote':
+        const quoteContent = block.content.map(line =>
+          DocNode.paragraph(this.parseInlineContent(line))
+        );
+        return DocNode.blockquote(quoteContent);
+
+      case 'ordered_list':
+        const orderedItems = block.items.map(item =>
+          DocNode.listItem(this.parseInlineContent(item))
+        );
+        return DocNode.orderedList(orderedItems);
+
+      case 'bullet_list':
+        const bulletItems = block.items.map(item =>
+          DocNode.listItem(this.parseInlineContent(item))
+        );
+        return DocNode.bulletList(bulletItems);
+
+      case 'paragraph':
+        const content = block.content.join(' ');
+        return DocNode.paragraph(this.parseInlineContent(content));
+
+      case 'horizontal_rule':
+        return DocNode.horizontalRule();
+
       default:
         return null;
     }
@@ -385,7 +863,20 @@ const MD = `
 
 ## h2
 
-**ASDFDS**
+**ASDFDS** is *sdlfahdfj* to \`dslfasdfkj\`
+
+\`\`\`js
+console.log("Hello, world!");
+\`\`\`
+
+> This is a blockquote
+> with multiple *lines*
+
+[Link](https://example.com)
+
+---
+
+![Image](https://example.com/image.png)
 `
 
 const parser = new MarkdownParser();
