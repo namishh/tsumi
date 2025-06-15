@@ -1948,11 +1948,125 @@ class MarkdownRenderer {
 }
 
 // :: SELECTION
+class Selection {
+  constructor(anchor, head) {
+    this.anchor = anchor; // Start position of the selection
+    this.head = head || anchor; // End position of the selection
+  }
 
+  /** 
+   * Create a cursor selection.
+   * @param {number} position - The position of the cursor.
+   * @return {Selection} A new selection instance representing a cursor.
+  */
+ static cursor(position) {
+    return new Selection(position, position);
+  }
+
+  /**
+   * Create selection with a range.
+   * @param {number} anchor - The start position of the selection.
+   * @param {number} head - The end position of the selection.
+   * @return {Selection} A new selection instance.
+   */
+  static range(anchor, head) {
+      return new Selection(anchor, head);
+  }
+
+  /** 
+   * get start position of the selection. (min of anchor and head) 
+   * @return {number} The start position of the selection.
+  */
+  get from() {
+    return Math.min(this.anchor, this.head);
+  }
+
+  /**
+   * get end position of the selection. (max of anchor and head)
+   * @return {number} The end position of the selection.
+   */
+  get to() {
+    return Math.max(this.anchor, this.head);
+  }
+
+  /**
+   * Checks if the selection is empty (anchor and head are the same).
+   * @returns {boolean} True if the selection is empty, false otherwise.
+   */
+  get empty() {
+    return this.anchor === this.head;
+  }
+
+  /**
+   * Checks if the selection is backwards (anchor is greater than head).
+   * @returns {boolean} True if the selection is backwards, false otherwise.
+   */
+  get backwards() {
+    return this.anchor > this.head;
+  }
+
+  /** 
+   * Move the selection by an offset.
+   * @param {number} offset - The offset to move the selection by.
+   * @return {Selection} A new selection instance with the moved position.
+  */
+  move(offset) {
+    return new Selection(this.anchor + offset, this.head + offset);
+  }
+
+  /**
+   * Extends the selection by a given offset.
+   * @param {number} offset - The offset to extend the selection by.
+   * @return {Selection} A new selection instance with the extended range. 
+  */
+  extend(offset) {
+    return new Selection(
+      Math.min(this.anchor, this.head + offset),
+      Math.max(this.anchor, this.head + offset)
+    );
+  }
+
+  /**
+   * Collapse to head position.
+   * @return {Selection} A new selection instance collapsed to the head position.
+   */
+  collapse() {
+    return new Selection(this.head, this.head);
+  }
+
+  /**
+   * Collapse the selection to the start position.
+   * @return {Selection} A new selection instance collapsed to the anchor position.
+   */
+  collapseToStart() {
+    return new Selection(this.from, this.from); 
+  }
+
+
+  /**
+   * Collapse the selection to the end position.
+   * @return {Selection} A new selection instance collapsed to the anchor position.
+   */
+  collapseToEnd() {
+    return new Selection(this.to, this.to);
+  }
+
+  /**
+   * Checkfs is this selection is equal to another selection.
+   * @param {Selection} other - The other selection to compare.
+   * @return {boolean} True if the selections are equal, false otherwise.
+   */
+  eq(other) {
+    return this.anchor === other.anchor && this.head === other.head;
+  }
+}
 
 // :: CURSOR
 
 // :: TRANSACTION
+
+
+// :: EDITOR
 
 class Editor {
   constructor(element) {
