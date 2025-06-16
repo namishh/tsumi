@@ -2250,6 +2250,26 @@ class Selection {
 
 // :: CURSOR
 
+class Cursor {
+  /**
+   * Creates a new Cursor instance.
+   * @param {Editor} editor - The editor instance.
+   */
+  constructor(editor) {
+    this.editor = editor;
+    this.cursorElement = null;
+    this.selectionElements = [];
+    this.position = 0;
+    this.isVisible = true;
+
+    this.init();
+  }
+
+  init() {
+
+  }
+}
+
 // :: TRANSACTION
 
 
@@ -2269,6 +2289,8 @@ class Editor {
     this.renderer = new MarkdownRenderer(this, {
       selection: this.selection,
     });
+
+    this.cursor = new Cursor(this);
   }
 
   example(markdown_string) {
